@@ -23,12 +23,16 @@ You can import the spot from urdf file or just add the spot USD as a reference o
 2. Try the existing spot demo[Spot Locomotion](https://docs.isaacsim.omniverse.nvidia.com/latest/robot_simulation/ext_isaacsim_robot_policy_example.html):
 
    a.The Boston Dynamics Spot quadruped example can be accessed by creating a empty stage.
+   
    b.Open the example menu using Robotics Examples > POLICY > Quadruped.
+   
    c.Press LOAD to open the scene.
+   
    d.Control with the keyboard
 
 4. Camera setup
 Add camera by GUI and code[Camera sensor](https://docs.isaacsim.omniverse.nvidia.com/4.2.0/features/sensors_simulation/isaac_sim_sensors_camera.html)
+
 Tips:
    -For camera included in usd, just set the prim.
    -For camera move with the robot, the camera need to be placed under the root, in spot is the body.

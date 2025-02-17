@@ -5,17 +5,18 @@ This repository contains tutorials for setting up the Spot robot in NVIDIA Isaac
 # Prerequisites
 
 Before starting, ensure you have the following installed:
+
 please check the requirements and follow the instruction 
 [Isaac Sim Official Website](https://docs.isaacsim.omniverse.nvidia.com/latest/installation)
 
 NVIDIA Isaac Sim (The code is tested on 4.2.0 version)
 
-Isaac Lab framework
+Isaac Lab framework(For the small demo)
 
 # Tutorials
 ## Basic Setup:
 1. How to import and configure Spot in Isaac Sim.
-You can download the urdf and usd from the repo[spor_urdf](https://github.com/carolzyy/urdf_spot)
+You can download the urdf and usd from the repo [spor_urdf](https://github.com/carolzyy/urdf_spot)
 
 You can import the spot from urdf file or just add the spot USD as a reference on the stage.
 [How To Import URDF](https://docs.isaacsim.omniverse.nvidia.com/latest/robot_setup/import_urdf.html)
@@ -41,6 +42,7 @@ Tips:
    
 5. Particle objects simulation
 [Official Demo](https://docs.omniverse.nvidia.com/extensions/latest/ext_physics/physics-particles.html)
+
 Tips:
 
    -For elastic object,e.g foam,rubber and toys, simulate with the finite element model.

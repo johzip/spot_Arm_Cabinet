@@ -31,7 +31,7 @@ You can import the spot from urdf file or just add the spot USD as a reference o
    
    d.Control with the keyboard
 
-4. Camera setup
+3. Camera setup
 Add camera by GUI and code [Camera sensor](https://docs.isaacsim.omniverse.nvidia.com/4.2.0/features/sensors_simulation/isaac_sim_sensors_camera.html)
 
 * Tips:
@@ -40,7 +40,7 @@ Add camera by GUI and code [Camera sensor](https://docs.isaacsim.omniverse.nvidi
    
   * For the camera expected to move with the robot, the camera needs to be placed under the root, for the spot needs to be under the body.
    
-5. Particle objects simulation
+4. Particle objects simulation
 [Official Demo](https://docs.omniverse.nvidia.com/extensions/latest/ext_physics/physics-particles.html)
 
 * Tips:

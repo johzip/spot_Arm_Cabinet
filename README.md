@@ -34,22 +34,22 @@ You can import the spot from urdf file or just add the spot USD as a reference o
 4. Camera setup
 Add camera by GUI and code[Camera sensor](https://docs.isaacsim.omniverse.nvidia.com/4.2.0/features/sensors_simulation/isaac_sim_sensors_camera.html)
 
-Tips:
+* Tips:
 
-    -For camera included in usd, just set the prim.
+  ** For the camera included in USD, just set the prim.
    
-    -For camera move with the robot, the camera need to be placed under the root, in spot is the body.
+  ** For the camera move with the robot, the camera need to be placed under the root, in spot is the body.
    
 5. Particle objects simulation
 [Official Demo](https://docs.omniverse.nvidia.com/extensions/latest/ext_physics/physics-particles.html)
 
-Tips:
+*Tips:
 
-    -For elastic object,e.g foam,rubber and toys, simulate with the finite element model.
+    ** For elastic object,e.g foam,rubber and toys, simulate with the finite element model.
    
-    -For deformable objects,e.g. soil, sand and cloth, use the particle model.
+    ** For deformable objects,e.g. soil, sand and cloth, use the particle model.
    
-    -Setup with the GUI would be easier but many parameters only can be set in the code.
+    ** Setup with the GUI would be easier but many parameters only can be set in the code.
    
 
 ## Small Demo:

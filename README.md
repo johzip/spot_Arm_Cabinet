@@ -54,3 +54,17 @@ Add camera by GUI and code [Camera sensor](https://docs.isaacsim.omniverse.nvidi
 
 ## Small Demo:
 The demo is for controlling the spot body and arm with the keyboard, and the observation is the RGB data from the front camera we mounted additionally.
+#### Arm Movement:
+- **Move along x-axis**: `W` / `S`
+- **Move along y-axis**: `A` / `D`
+- **Move along z-axis**: `Z` / `X`
+
+#### Base Movement:
+- **Move forward/backward**: `↑` / `↓` (Up/Down Arrow)
+- **Move left/right**: `←` / `→` (Left/Right Arrow)
+- **Rotate along z-axis**: `M` / `N`
+
+##### Isaac Lab installation is needed to run the teleoperation script for the Spot robot, use the following command:
+
+```
+/path-to-isaac/isaac-sim-4.2.0/python.sh /path-to-code/Isaac_spot_tutorials/script/teleop_se3_agent.py

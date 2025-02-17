@@ -53,4 +53,4 @@ Tips:
    
 
 ## Small Demo:
-
+The demo is for control the spot body and arm with the kayboard, and the observation is the rgb data from the front camera we mounted additionally.

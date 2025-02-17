@@ -73,3 +73,8 @@ Isaac Lab installation is required to run the teleoperation script for the Spot 
 /path-to-isaac/isaac-sim-4.2.0/python.sh /path-to-code/Isaac_spot_tutorials/script/teleop_se3_agent.py
 ```
 
+### Other Interesting tutorials maybe help
+- [Articulation Controller](https://docs.isaacsim.omniverse.nvidia.com/latest/robot_simulation/articulation_controller.html)
+- [Kinematics Solver](https://docs.isaacsim.omniverse.nvidia.com/latest/manipulators/manipulators_lula_kinematics.html)
+
+

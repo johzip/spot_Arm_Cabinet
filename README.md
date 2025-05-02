@@ -10,7 +10,7 @@ Please check the requirements and follow the instructions provided in the offici
 [Isaac Sim Official Website](https://docs.isaacsim.omniverse.nvidia.com/latest/installation)
 
 - **NVIDIA Isaac Sim** (Tested on version 4.2.0)
-- **Isaac Lab framework** (Required for the small demo)
+- **Isaac Lab framework** (Required for the small demo,Tested on version 1.2.0)
 
 ## Tutorials
 

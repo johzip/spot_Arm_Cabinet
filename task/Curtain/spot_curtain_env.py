@@ -27,20 +27,19 @@ class SpotCurtainEnvCfg(DirectRLEnvCfg):
     observation_space = 144
     camera = True
 
-    viewer = ViewerCfg(eye=(-5.89, 4.89, 4.36))
+    viewer = ViewerCfg(eye=(-2, 0.0, 2.0), lookat=(3.0, 4.0, 0.0))
 
     # simulation
     sim: SimulationCfg = SimulationCfg(
         dt=1 / 200,
         render_interval=decimation,
         use_fabric= True
-                                       )
+        )
     root = os.getcwd()
     # robot need to change
     robot_cfg: ArticulationCfg = SPOT_CFG.replace(prim_path="/World/envs/env_.*/Robot")
     robot_cfg.spawn.usd_path = root + '/asset/spot/spot.usd'
-    robot_cfg.init_state.rot = (0.65, 0.0, 0.0, -0.75)
-    robot_cfg.init_state.pos = (0.05, 1.4, 0.4)
+    robot_cfg.init_state.pos = (-0.05, 1.6, 0.4)
 
     camera_cfg: CameraCfg = CameraCfg(
         prim_path="/World/envs/env_.*/Robot/body/center_camera/center_camera", #/spot/center_camera/center_camera
@@ -106,15 +105,15 @@ class SpotCurtainEnv( DirectRLEnv):
 
         spawn_ground_plane(prim_path="/World/ground", cfg=GroundPlaneCfg())
 
-        # Spawn cabinet directly (like in working example)
+        # Spawn cabinet directly 
         for env_idx in range(self.scene.cfg.num_envs):
             cabinet_prim_path = f"/World/envs/env_{env_idx}/Cabinet"
             cfg = sim_utils.UsdFileCfg(usd_path="/home/zipfelj/workspace/Articulate3D/full_scene_sim_ready/model_scene_video.usda")
             spawn_from_usd(
                 prim_path=cabinet_prim_path,
                 cfg=cfg,
-                translation=(0.0, -1.1, 0.39146906),
-                orientation=(1.4, 0, 0, -0.997727),  # x, y, z, w
+                translation=(1.2, 1.5, 0.39146906),
+                orientation=(0.69, 0, 0, 0.72),  # x, y, z, w
             )
 
         # clone, filter, and replicate

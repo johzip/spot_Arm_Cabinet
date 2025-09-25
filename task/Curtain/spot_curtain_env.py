@@ -12,6 +12,7 @@ from isaaclab.sim import SimulationCfg
 from isaaclab.sim.spawners.from_files import GroundPlaneCfg, spawn_ground_plane
 from isaaclab.utils import configclass
 from isaaclab.sensors import CameraCfg,Camera
+from isaaclab.actuators import ImplicitActuatorCfg 
 
 from cfg.robotcfg import SPOT_CFG
 from controller.spot_operational_space import OperationSpaceController
@@ -48,19 +49,28 @@ class SpotCurtainEnvCfg(DirectRLEnvCfg):
         spawn= None
     )
 
-
-    # table cfg
-    curtain_cfg: RigidObjectCfg = RigidObjectCfg(
-        prim_path="/World/envs/env_.*/curtain",
+    # Cabinet config
+    cabinet_cfg: ArticulationCfg = ArticulationCfg(
+        prim_path="/World/envs/env_.*/Cabinet",
         spawn=sim_utils.UsdFileCfg(
-            usd_path=root + f"/asset/objects/curtain.usd",
+            usd_path="/home/zipfelj/workspace/Articulate3D/full_scene_sim_ready/model_scene_video.usda",
         ),
-        init_state=RigidObjectCfg.InitialStateCfg(
-            pos=(1.5, 1.5, 0.2),
-            rot=(0.707, 0, 0, 0.707,)
-        )
+        init_state=ArticulationCfg.InitialStateCfg(
+            pos=(0.0, -1.1, 0.39146906),
+            rot=(1.4, 0, 0, -0.997727),  # x, y, z, w
+            joint_pos={".*": 0.0},  # Initialize all joints to 0
+        ),
+        # TODO: adjust the Joints, currently the cabinet is bugged to the front
+        actuators={
+            "all_joints": ImplicitActuatorCfg(
+                joint_names_expr=[".*"],  # Match all joints
+                effort_limit=100.0,
+                velocity_limit=2.0,
+                stiffness=1000.0,
+                damping=100.0,
+            ),
+        },
     )
-
 
     # scene
     scene: InteractiveSceneCfg = InteractiveSceneCfg(num_envs=4, env_spacing=4.0, replicate_physics=False)
@@ -84,6 +94,11 @@ class SpotCurtainEnv( DirectRLEnv):
         super().__init__(cfg, render_mode, **kwargs)
         print('=================Spot Curtain Env====================')
         self.num_actions = cfg.action_space
+        self.dt = self.cfg.sim.dt * self.cfg.decimation
+        self.flag = torch.zeros((self.num_envs), device=self.sim.device)
+        self._ee_name = 'arm0_link_ee'
+
+        self.num_actions = cfg.action_space
         self.robot_dof_targets = torch.zeros(
             (self.num_envs, self.robot.num_joints), dtype=torch.float, device=self.sim.device
         )
@@ -97,11 +112,24 @@ class SpotCurtainEnv( DirectRLEnv):
         self.ee_idx = self.robot.find_bodies("arm_ee")[0][0]
         self._ee_name = 'arm0_link_ee'
         self.controller.init_ctrl(self._ee_name,self.robot.body_names,self.robot.joint_names)
+    
+    def _post_setup_scene(self):
+        """Called after scene setup is complete and physics views are created."""
+        #self.robot_dof_targets = torch.zeros(
+        #    (self.num_envs, self.robot.num_joints), dtype=torch.float, device=self.sim.device
+        #)
+        #self.robot_dof_pos = torch.zeros(
+        #    (self.num_envs, self.robot.num_joints), device=self.sim.device)
+        #self.actions = torch.zeros((self.num_envs, self.num_actions), device=self.sim.device)
+
+        # Initialize robot-specific properties
+        self.ee_idx = self.robot.find_bodies("arm_ee")[0][0]
+        self.controller.init_ctrl(self._ee_name, self.robot.body_names, self.robot.joint_names)
 
 
     def _setup_scene(self,) :
         self.robot = Articulation(self.cfg.robot_cfg)
-        self.curtain = RigidObject(self.cfg.curtain_cfg)
+        self.cabinet = Articulation(self.cfg.cabinet_cfg)
         self._camera = Camera(self.cfg.camera_cfg)
 
         spawn_ground_plane(prim_path="/World/ground", cfg=GroundPlaneCfg())
@@ -111,16 +139,16 @@ class SpotCurtainEnv( DirectRLEnv):
         # add articultion to scene
         print(f'robot object check: {self.robot}')
         self.scene.articulations["robot"] = self.robot
+        self.scene.articulations["cabinet"] = self.cabinet
         self.scene.sensors["camera"] = self._camera
 
         self.controller = OperationSpaceController(num_robot=self.num_envs,
                                                    device=self.device,
                                                    )
 
-        # add lights
+        # Add lights
         light_cfg = sim_utils.DomeLightCfg(intensity=2000.0)
         light_cfg.func("/World/Light", light_cfg)
-
 
 
     def _reset_idx(self, env_ids):
@@ -129,7 +157,7 @@ class SpotCurtainEnv( DirectRLEnv):
         super()._reset_idx(env_ids)
         num_indices = len(env_ids)
 
-        limit = self.robot.data.joint_limits[:, :, :]
+        limit = self.robot.data.joint_pos_limits[:, :, :]
         pos = torch.clamp(self.robot.data.default_joint_pos[env_ids], limit[:, :, 0], limit[:, :, 1])
 
         dof_pos = torch.zeros((num_indices, self.robot.num_joints), device=self.sim.device)
@@ -144,6 +172,12 @@ class SpotCurtainEnv( DirectRLEnv):
         self.robot.write_root_velocity_to_sim(default_root_state[:, 7:], env_ids)
         self.robot.write_joint_state_to_sim(dof_pos, dof_vel, None, env_ids)
 
+        if hasattr(self, 'cabinet') and self.cabinet is not None:
+            # Reset cabinet position (RigidObject reset)
+            cabinet_default_state = self.cabinet.data.default_root_state[env_ids].clone()
+            cabinet_default_state[:, :3] += self.scene.env_origins[env_ids]
+            self.cabinet.write_root_pose_to_sim(cabinet_default_state[:, :7], env_ids)
+            self.cabinet.write_root_velocity_to_sim(cabinet_default_state[:, 7:], env_ids)
 
 
     def _pre_physics_step(self, actions):
@@ -167,7 +201,7 @@ class SpotCurtainEnv( DirectRLEnv):
                                                   self.actions[:,:3],
                                                   arm_comd) #, success
         self.robot_dof_targets[:, index] = action
-        limit = self.robot.data.joint_limits[:, :, :]
+        limit = self.robot.data.joint_pos_limits[:, :, :]
         self.robot_dof_targets = torch.clamp(self.robot_dof_targets, limit[:, :, 0], limit[:, :, 1])
 
 

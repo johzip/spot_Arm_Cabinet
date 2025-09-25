@@ -46,7 +46,7 @@ import gymnasium as gym
 import torch
 import omni.log
 
-from task.Cabinet import SpotCabinetEnv 
+from task.Curtain import SpotCurtainEnv 
 from controller import se3_keyboard, spot_operational_space, spot_loco_solver, spot_kinematics_solver
 from controller.se3_keyboard import MMKeyboard
 from isaaclab_tasks.utils import parse_env_cfg

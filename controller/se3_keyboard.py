@@ -14,7 +14,7 @@ import carb
 import omni
 
 #from ..device_base import DeviceBase
-from omni.isaac.lab.devices.device_base import DeviceBase
+from isaaclab.devices.device_base import DeviceBase
 
 class MMKeyboard(DeviceBase):
     """A keyboard controller for sending base and arm commands as delta poses and binary command for the gripper(open/close).

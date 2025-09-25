@@ -1,9 +1,9 @@
-import omni.isaac.lab.sim as sim_utils
-from omni.isaac.lab.actuators import ImplicitActuatorCfg
-from omni.isaac.lab.assets.articulation import ArticulationCfg
-from omni.isaac.lab.utils.assets import ISAAC_NUCLEUS_DIR
+import isaaclab.sim as sim_utils
+from isaaclab.actuators import ImplicitActuatorCfg
+from isaaclab.assets.articulation import ArticulationCfg
+from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 import torch
-from omni.isaac.lab.actuators import DelayedPDActuatorCfg, RemotizedPDActuatorCfg
+from isaaclab.actuators import DelayedPDActuatorCfg, RemotizedPDActuatorCfg
 ##
 # Configuration
 ##
@@ -123,7 +123,7 @@ and the output torque (N*m). It is used to interpolate the output torque based o
 
 SPOT_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
-        usd_path=',/asset/spot/spot.usd',
+        usd_path=',/asset/spot_arm/spot_arm.usd',
 #f"{ISAAC_NUCLEUS_DIR}/Robots/BostonDynamics/spot/spot.usd",
         activate_contact_sensors=True,
         rigid_props=sim_utils.RigidBodyPropertiesCfg(

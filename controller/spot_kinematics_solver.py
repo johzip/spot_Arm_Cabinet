@@ -11,7 +11,7 @@ from typing import Optional, Tuple
 import os
 import carb
 import numpy as np
-from omni.isaac.core.utils.extensions import enable_extension
+from isaacsim.core.utils.extensions import enable_extension
 enable_extension("omni.isaac.motion_generation")
 from omni.isaac.motion_generation.kinematics_interface import KinematicsSolver
 from omni.isaac.motion_generation import LulaKinematicsSolver

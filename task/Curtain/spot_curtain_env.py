@@ -4,14 +4,14 @@ import torch
 import os
 
 
-import omni.isaac.lab.sim as sim_utils
-from omni.isaac.lab.assets import Articulation, ArticulationCfg,RigidObjectCfg,RigidObject
-from omni.isaac.lab.envs import DirectRLEnv, DirectRLEnvCfg, ViewerCfg
-from omni.isaac.lab.scene import InteractiveSceneCfg
-from omni.isaac.lab.sim import SimulationCfg
-from omni.isaac.lab.sim.spawners.from_files import GroundPlaneCfg, spawn_ground_plane
-from omni.isaac.lab.utils import configclass
-from omni.isaac.lab.sensors import CameraCfg,Camera
+import isaaclab.sim as sim_utils
+from isaaclab.assets import Articulation, ArticulationCfg,RigidObjectCfg,RigidObject
+from isaaclab.envs import DirectRLEnv, DirectRLEnvCfg, ViewerCfg
+from isaaclab.scene import InteractiveSceneCfg
+from isaaclab.sim import SimulationCfg
+from isaaclab.sim.spawners.from_files import GroundPlaneCfg, spawn_ground_plane
+from isaaclab.utils import configclass
+from isaaclab.sensors import CameraCfg,Camera
 
 from cfg.robotcfg import SPOT_CFG
 from controller.spot_operational_space import OperationSpaceController
@@ -55,10 +55,10 @@ class SpotCurtainEnvCfg(DirectRLEnvCfg):
         spawn=sim_utils.UsdFileCfg(
             usd_path=root + f"/asset/objects/curtain.usd",
         ),
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(1.5, 1.5, 0.2),
-                                                  rot=(0.707, 0, 0, 0.707,)
-                                                  ),
-
+        init_state=RigidObjectCfg.InitialStateCfg(
+            pos=(1.5, 1.5, 0.2),
+            rot=(0.707, 0, 0, 0.707,)
+        )
     )
 
 
@@ -82,7 +82,7 @@ class SpotCurtainEnv( DirectRLEnv):
                  render_mode: str | None = None, **kwargs):
 
         super().__init__(cfg, render_mode, **kwargs)
-
+        print('=================Spot Curtain Env====================')
         self.num_actions = cfg.action_space
         self.robot_dof_targets = torch.zeros(
             (self.num_envs, self.robot.num_joints), dtype=torch.float, device=self.sim.device
@@ -109,6 +109,7 @@ class SpotCurtainEnv( DirectRLEnv):
         self.scene.clone_environments(copy_from_source=False)
         self.scene.filter_collisions(global_prim_paths=[])
         # add articultion to scene
+        print(f'robot object check: {self.robot}')
         self.scene.articulations["robot"] = self.robot
         self.scene.sensors["camera"] = self._camera
 

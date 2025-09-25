@@ -8,8 +8,15 @@
 """Launch Isaac Sim Simulator first."""
 
 import argparse
+import sys
+import os
 
-from omni.isaac.lab.app import AppLauncher
+#from omni.isaac.lab.app import AppLauncher
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+from isaaclab.app import AppLauncher
 
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Keyboard teleoperation for DeMoMTasksuite.")
@@ -25,8 +32,6 @@ parser.add_argument("--sensitivity", type=float, default=1.0, help="Sensitivity 
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
 
-# append AppLauncher cli args
-#AppLauncher.add_app_launcher_args(parser)
 # parse the arguments
 args_cli = parser.parse_args()
 args_cli.enable_cameras = True
@@ -39,12 +44,15 @@ simulation_app = app_launcher.app
 
 import gymnasium as gym
 import torch
-
 import omni.log
-import task
+
+from task.Curtain import SpotCurtainEnv 
+from controller import se3_keyboard, spot_operational_space, spot_loco_solver, spot_kinematics_solver
 from controller.se3_keyboard import MMKeyboard
-from omni.isaac.lab_tasks.utils import parse_env_cfg
-from omni.isaac.lab.sensors import save_images_to_file
+from isaaclab_tasks.utils import parse_env_cfg
+from isaaclab.sensors import save_images_to_file
+#from omni.isaac.lab_tasks.utils import parse_env_cfg
+#from omni.isaac.lab.sensors import save_images_to_file
 
 
 
@@ -58,6 +66,7 @@ def main():
     # create environment
     env = gym.make(args_cli.task, cfg=env_cfg,render_mode="rgb_array" if args_cli.enable_cameras else None)
     # check environment name (for reach , we don't allow the gripper)
+    print(f" before Curtain? ")
     if "Curtain" in args_cli.task:
         omni.log.warn(
             f"The environment '{args_cli.task}' does not support gripper control. The device command will be ignored."
@@ -83,7 +92,8 @@ def main():
 
     teleop_interface.reset()
 
-    actions = torch.zeros_like(env.actions)
+    #actions = torch.zeros_like(env.actions)
+    actions = torch.zeros(env.action_space.shape, dtype=torch.float32, device=args_cli.device)
 
     # simulate environment
     while simulation_app.is_running():

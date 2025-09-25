@@ -11,9 +11,9 @@ from typing import Optional, Tuple
 import os
 import carb
 import numpy as np
-import omni.isaac.lab.utils.string as string_utils
+import isaaclab.utils.string as string_utils
 import torch
-from omni.isaac.core.utils.extensions import enable_extension
+from isaacsim.core.utils.extensions import enable_extension
 enable_extension("omni.isaac.motion_generation")
 #from omni.isaac.motion_generation import LulaKinematicsSolver
 from controller.spot_kinematics_solver import ArticulationKinematicsSolver

@@ -1,4 +1,4 @@
 
-from . import Curtain
+from . import Cabinet
 
 

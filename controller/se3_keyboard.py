@@ -26,7 +26,7 @@ class MMKeyboard(DeviceBase):
     """
 
     def __init__(self,
-                 arm_pos_sensitivity: float = 0.4,
+                 arm_pos_sensitivity: float = 0.2,
                  arm_rot_sensitivity: float = 0.8,
                  base_com_sensitivity: float = 1):
         """Initialize the keyboard layer.
@@ -185,8 +185,8 @@ class MMKeyboard(DeviceBase):
             "UP": np.asarray([1.0, 0.0, 0.0]) * self.base_com_sen,
             "DOWN": np.asarray([-1.0, 0.0, 0.0]) * self.base_com_sen,
             # right and left command for base
-            "LEFT": np.asarray([0.0, -1.0, 0.0]) * self.base_com_sen,
-            "RIGHT": np.asarray([0.0, 1.0, 0.0]) * self.base_com_sen,
+            "LEFT": np.asarray([0.0, 1.0, 0.0]) * self.base_com_sen,
+            "RIGHT": np.asarray([0.0, -1.0, 0.0]) * self.base_com_sen,
             # yaw command (around z-axis) for base
             "M": np.asarray([0.0, 0.0, 1.0]) * self.base_com_sen,
             "N": np.asarray([0.0, 0.0, -1.0]) * self.base_com_sen,

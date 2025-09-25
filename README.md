@@ -12,7 +12,7 @@ Please check the requirements and follow the instructions provided in the offici
 
 - **NVIDIA Isaac Sim** (Tested on version 5.0.0) 
 - **Isaac Lab framework** (Required for the small demo,Tested on version 2.2.1)
-   - execute path/to/isaac-sim/python.sh -m pip install isaaclab
+   - execute home/zipfelj/isaac-sim/python.sh -m pip install isaaclab
 
 ## Tutorials
 

@@ -51,31 +51,6 @@ class SpotCurtainEnvCfg(DirectRLEnvCfg):
         spawn= None
     )
 
-    # Cabinet config
-    cabinet_cfg: ArticulationCfg = ArticulationCfg(
-        prim_path="/World/envs/env_.*/Cabinet",
-        spawn=sim_utils.UsdFileCfg(
-            usd_path="/home/zipfelj/workspace/Articulate3D/full_scene_sim_ready/model_scene_video.usda",
-        ),
-        init_state=ArticulationCfg.InitialStateCfg(
-            pos=(0.0, -1.1, 0.39146906),
-            rot=(1.4, 0, 0, -0.997727),  # x, y, z, w
-            joint_pos={
-                "drawer_joint": 0.0, 
-            },
-        ),
-        # TODO: adjust the Joints, currently the cabinet is bugged to the front
-        actuators={
-            "drawer_actuator": ImplicitActuatorCfg(
-                joint_names_expr=["drawer_joint"],  # ✅ Match specific joint name
-                effort_limit=50.0,    # Lower for drawer (was 100.0)
-                velocity_limit=1.0,   # Lower for drawer (was 2.0)
-                stiffness=500.0,      # Lower for smoother drawer motion (was 1000.0)
-                damping=50.0,         # Lower damping (was 100.0)
-            ),
-        },
-    )
-
     # scene
     scene: InteractiveSceneCfg = InteractiveSceneCfg(num_envs=4, env_spacing=4.0, replicate_physics=False)
 
@@ -125,19 +100,38 @@ class SpotCurtainEnv( DirectRLEnv):
 
 
     def _setup_scene(self,) :
+        from isaaclab.sim.spawners.from_files import spawn_from_usd
         self.robot = Articulation(self.cfg.robot_cfg)
-        self.cabinet = Articulation(self.cfg.cabinet_cfg)
         self._camera = Camera(self.cfg.camera_cfg)
 
         spawn_ground_plane(prim_path="/World/ground", cfg=GroundPlaneCfg())
+
+        # Spawn cabinet directly (like in working example)
+        for env_idx in range(self.scene.cfg.num_envs):
+            cabinet_prim_path = f"/World/envs/env_{env_idx}/Cabinet"
+            cfg = sim_utils.UsdFileCfg(usd_path="/home/zipfelj/workspace/Articulate3D/full_scene_sim_ready/model_scene_video.usda")
+            spawn_from_usd(
+                prim_path=cabinet_prim_path,
+                cfg=cfg,
+                translation=(0.0, -1.1, 0.39146906),
+                orientation=(1.4, 0, 0, -0.997727),  # x, y, z, w
+            )
+
         # clone, filter, and replicate
         self.scene.clone_environments(copy_from_source=False)
         self.scene.filter_collisions(global_prim_paths=[])
         # add articultion to scene
         print(f'robot object check: {self.robot}')
         self.scene.articulations["robot"] = self.robot
-        self.scene.articulations["cabinet"] = self.cabinet
         self.scene.sensors["camera"] = self._camera
+
+        try:
+            self.cabinet = Articulation("/World/envs/env_.*/Cabinet")
+            self.scene.articulations["cabinet"] = self.cabinet
+            print("Cabinet added as controllable articulation")
+        except Exception as e:
+            print(f"Cabinet added as static object: {e}")
+            self.cabinet = None
 
         self.controller = OperationSpaceController(num_robot=self.num_envs,
                                                    device=self.device,

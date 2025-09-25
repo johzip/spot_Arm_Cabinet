@@ -27,7 +27,7 @@ class SpotCurtainEnvCfg(DirectRLEnvCfg):
     observation_space = 144
     camera = True
 
-    viewer = ViewerCfg(eye=(-5.89, 4.89, 6.36))
+    viewer = ViewerCfg(eye=(-5.89, 4.89, 4.36))
 
     # simulation
     sim: SimulationCfg = SimulationCfg(
@@ -39,6 +39,8 @@ class SpotCurtainEnvCfg(DirectRLEnvCfg):
     # robot need to change
     robot_cfg: ArticulationCfg = SPOT_CFG.replace(prim_path="/World/envs/env_.*/Robot")
     robot_cfg.spawn.usd_path = root + '/asset/spot/spot.usd'
+    robot_cfg.init_state.rot = (0.65, 0.0, 0.0, -0.75)
+    robot_cfg.init_state.pos = (0.05, 1.4, 0.4)
 
     camera_cfg: CameraCfg = CameraCfg(
         prim_path="/World/envs/env_.*/Robot/body/center_camera/center_camera", #/spot/center_camera/center_camera
@@ -58,16 +60,18 @@ class SpotCurtainEnvCfg(DirectRLEnvCfg):
         init_state=ArticulationCfg.InitialStateCfg(
             pos=(0.0, -1.1, 0.39146906),
             rot=(1.4, 0, 0, -0.997727),  # x, y, z, w
-            joint_pos={".*": 0.0},  # Initialize all joints to 0
+            joint_pos={
+                "drawer_joint": 0.0, 
+            },
         ),
         # TODO: adjust the Joints, currently the cabinet is bugged to the front
         actuators={
-            "all_joints": ImplicitActuatorCfg(
-                joint_names_expr=[".*"],  # Match all joints
-                effort_limit=100.0,
-                velocity_limit=2.0,
-                stiffness=1000.0,
-                damping=100.0,
+            "drawer_actuator": ImplicitActuatorCfg(
+                joint_names_expr=["drawer_joint"],  # ✅ Match specific joint name
+                effort_limit=50.0,    # Lower for drawer (was 100.0)
+                velocity_limit=1.0,   # Lower for drawer (was 2.0)
+                stiffness=500.0,      # Lower for smoother drawer motion (was 1000.0)
+                damping=50.0,         # Lower damping (was 100.0)
             ),
         },
     )
@@ -115,13 +119,6 @@ class SpotCurtainEnv( DirectRLEnv):
     
     def _post_setup_scene(self):
         """Called after scene setup is complete and physics views are created."""
-        #self.robot_dof_targets = torch.zeros(
-        #    (self.num_envs, self.robot.num_joints), dtype=torch.float, device=self.sim.device
-        #)
-        #self.robot_dof_pos = torch.zeros(
-        #    (self.num_envs, self.robot.num_joints), device=self.sim.device)
-        #self.actions = torch.zeros((self.num_envs, self.num_actions), device=self.sim.device)
-
         # Initialize robot-specific properties
         self.ee_idx = self.robot.find_bodies("arm_ee")[0][0]
         self.controller.init_ctrl(self._ee_name, self.robot.body_names, self.robot.joint_names)

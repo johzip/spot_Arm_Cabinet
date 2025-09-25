@@ -1,6 +1,7 @@
 # Spot Robot Setup Tutorials in Isaac Sim
 
-This repository contains tutorials for setting up the Spot robot in NVIDIA Isaac Sim. The tutorials guide users through installation, configuration, and running basic simulations with the Spot robot.
+This repository contains tutorials for setting up the Spot robot with Arm in NVIDIA Isaac Sim. The tutorials guide users through installation, configuration, and running basic simulations with the Spot robot.
+The simulation Scenario is a Cabinet in a office Room, the top drawer of this cabinet can be opened by the robot Arm.
 
 ## Prerequisites
 
@@ -9,8 +10,9 @@ Before starting, ensure you have the following installed:
 Please check the requirements and follow the instructions provided in the official documentation:\
 [Isaac Sim Official Website](https://docs.isaacsim.omniverse.nvidia.com/latest/installation)
 
-- **NVIDIA Isaac Sim** (Tested on version 4.2.0)
-- **Isaac Lab framework** (Required for the small demo,Tested on version 1.2.0)
+- **NVIDIA Isaac Sim** (Tested on version 5.0.0) 
+- **Isaac Lab framework** (Required for the small demo,Tested on version 2.2.1)
+   - execute home/zipfelj/isaac-sim/python.sh -m pip install isaaclab
 
 ## Tutorials
 

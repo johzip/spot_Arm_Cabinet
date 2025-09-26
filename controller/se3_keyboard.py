@@ -37,6 +37,7 @@ class MMKeyboard(DeviceBase):
             base_com_sensitivity: Magnitude of scale base commands scaling. Defaults to 1.
         """
         # store inputs
+        self.gripper_sen = arm_rot_sensitivity
         self.arm_pos_sen = arm_pos_sensitivity
         self.arm_rot_sen = arm_rot_sensitivity
         self.base_com_sen = base_com_sensitivity
@@ -52,7 +53,7 @@ class MMKeyboard(DeviceBase):
         # bindings for keyboard to command
         self._create_key_bindings()
         # command buffers
-        self._close_gripper = False
+        self._gripper_command = np.zeros(3) # (open/close, rotation, pitch)
         self._delta_arm_pos = np.zeros(3)  # (x, y, z)
         self._delta_arm_rot = np.zeros(3)  # (roll, pitch, yaw)
         self._delta_base_com = np.zeros(3)  # (x, y, yaw)
@@ -72,13 +73,25 @@ class MMKeyboard(DeviceBase):
         msg += f"\tKeyboard name: {self._input.get_keyboard_name(self._keyboard)}\n"
         msg += "\t----------------------------------------------\n"
         #msg += "\tToggle gripper (open/close): K\n"
+        msg += "\t🤖 ARM POSITION CONTROL:\n"
         msg += "\tMove arm along x-axis: W/S\n"
         msg += "\tMove arm along y-axis: A/D\n"
         msg += "\tMove arm along z-axis: Z/X\n"
-
+        msg += "\t----------------------------------------------\n"
+        msg += "\t🤏 GRIPPER CONTROL:\n"
+        msg += "\tOpen gripper: NUMPAD 1\n"
+        msg += "\tClose gripper: NUMPAD 2\n"
+        msg += "\t----------------------------------------------\n"
+        msg += "\t🔄 WRIST CONTROL:\n"
+        msg += "\tRotate wrist: NUMPAD 4/5\n"
+        msg += "\tTip wrist: NUMPAD 7/8\n"
+        msg += "\t----------------------------------------------\n"
+        msg += "\t🚶 BASE CONTROL:\n"
         msg += "\tMove base forward and back: up/down\n"
         msg += "\tMove base left and right: left/right\n"
         msg += "\tRotate base along z-axis: M/N"
+        msg += "\t----------------------------------------------\n"
+        msg += "\tReset environment: L\n"
 
         return msg
 
@@ -88,7 +101,7 @@ class MMKeyboard(DeviceBase):
 
     def reset(self):
         # command buffers
-        self._gripper_act = False
+        self._gripper_command = np.zeros(3)  # (open/close, rotation, pitch)
         self._delta_arm_pos = np.zeros(3)  # (x, y, z)
         self._delta_arm_rot = np.zeros(3)  # (roll, pitch, yaw)
         self._delta_base_com = np.zeros(3)  # (x, y, yaw)
@@ -118,7 +131,8 @@ class MMKeyboard(DeviceBase):
         # convert to rotation vector
         rot_vec = Rotation.from_euler("XYZ", self._delta_arm_rot).as_rotvec()
         arm_pose = np.concatenate([self._delta_arm_pos, rot_vec])
-        gripper_act =  self._gripper_act#.copy()
+        #TODO: replace Gripper act with command, and handle command here
+        gripper_command = self._gripper_command.copy()
         base_com = self._delta_base_com.copy()
         self._delta_arm_pos = np.zeros(3)  # (x, y, z)
         self._delta_arm_rot = np.zeros(3)  # (roll, pitch, yaw)
@@ -126,7 +140,7 @@ class MMKeyboard(DeviceBase):
         #self._value = None
 
         # return the command and gripper state
-        return arm_pose,gripper_act,base_com,self._finish
+        return arm_pose, gripper_command, base_com, self._finish
 
     """
     Internal helpers.
@@ -142,10 +156,20 @@ class MMKeyboard(DeviceBase):
         if event.type == carb.input.KeyboardEventType.KEY_PRESS:
             if event.input.name == "L":
                 self._finish = True
-            if event.input.name == "K":
-                self._gripper_act = np.logical_not(self._gripper_act)
-                print(f'grasp state: {self._gripper_act}')
-                self._value = event.input.name
+
+            if event.input.name in ["NUMPAD_7", "NUMPAD_8", "NUMPAD_4", "NUMPAD_5", "NUMPAD_1", "NUMPAD_2"]:
+                #TODO: test this, rework action_map
+                self._gripper_command += self._INPUT_KEY_MAPPING[event.input.name]
+                action_map = {
+                    "NUMPAD_7": "👐 Open Gripper",
+                    "NUMPAD_8": "🤏 Close Gripper", 
+                    "NUMPAD_4": "🔄 Rotating wrist CCW",
+                    "NUMPAD_5": "🔄 Rotating wrist CW", 
+                    "NUMPAD_1": "↗️ Tipping wrist up",
+                    "NUMPAD_2": "↘️ Tipping wrist down"
+                }
+                print(action_map.get(event.input.name, "Wrist movement"))
+
             elif event.input.name in ["W", "S", "A", "D", "Z", "X"]:
                 self._value = event.input.name
                 self._delta_arm_pos += self._INPUT_KEY_MAPPING[event.input.name]
@@ -162,15 +186,25 @@ class MMKeyboard(DeviceBase):
                 self._delta_base_com -= self._INPUT_KEY_MAPPING[event.input.name]
                 self._value = event.input.name+'_n'
 
-
-        # since no error, we are fine :)
+            elif event.input.name in ["NUMPAD_7", "NUMPAD_8", "NUMPAD_4", "NUMPAD_5", "NUMPAD_1", "NUMPAD_2"]:
+                self._gripper_command -= self._INPUT_KEY_MAPPING[event.input.name]
+            
         return True
 
     def _create_key_bindings(self):
         """Creates default key binding."""
         self._INPUT_KEY_MAPPING = {
-            # toggle: gripper command
-            "K": True,
+
+            # gripper open close command
+            "NUMPAD_7": np.asarray([1.0, 0.0, 0.0]) * self.gripper_sen,
+            "NUMPAD_8": np.asarray([-1.0, 0.0, 0.0]) * self.gripper_sen,
+            # Rotate wrist (around X-axis) (rolling)
+            "NUMPAD_4": np.asarray([0.0, 1.0, 0.0]) * self.gripper_sen,
+            "NUMPAD_5": np.asarray([0.0, -1.0, 0.0]) * self.gripper_sen,
+            # pitch the Wrist (tipping - move around Y-axis)
+            "NUMPAD_1": np.asarray([0.0, 0.0, 1.0]) * self.gripper_sen,
+            "NUMPAD_2": np.asarray([0.0, 0.0, -1.0]) * self.gripper_sen,
+
             # x-axis (forward) for arm
             "W": np.asarray([1.0, 0.0, 0.0]) * self.arm_pos_sen,
             "S": np.asarray([-1.0, 0.0, 0.0]) * self.arm_pos_sen,

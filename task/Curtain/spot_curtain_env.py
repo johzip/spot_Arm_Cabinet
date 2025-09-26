@@ -23,7 +23,6 @@ class SpotCurtainEnvCfg(DirectRLEnvCfg):
     # env
     decimation = 5
     episode_length_s = 6000.0
-    #TODO: action space need to change to include gripper = 12
     action_space = 12
     observation_space = 144
     camera = True
@@ -172,7 +171,6 @@ class SpotCurtainEnv( DirectRLEnv):
 
 
     def _pre_physics_step(self, actions):
-        #TODO: gripper command action_space needs to be filled
 
 
         self.actions = actions.clone().to(self.sim.device)
@@ -185,8 +183,7 @@ class SpotCurtainEnv( DirectRLEnv):
         arm_comd =None
         if self.actions[:,3:].any()!=0:
             arm_comd = self.actions[:,3:]
-
-        #TODO: add grip_comd
+            #TODO currently arm_comd include gripper command, maby need to separate them later and send to controller seperately
 
         # do not set the base_pose if arm related to body frame
         action,index,_ = self.controller.compute(lin_vel, ang_vel,  gravity_b,

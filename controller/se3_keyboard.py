@@ -26,7 +26,7 @@ class MMKeyboard(DeviceBase):
     """
 
     def __init__(self,
-                 arm_pos_sensitivity: float = 0.2,
+                 arm_pos_sensitivity: float = 0.4,
                  arm_rot_sensitivity: float = 0.8,
                  base_com_sensitivity: float = 1):
         """Initialize the keyboard layer.

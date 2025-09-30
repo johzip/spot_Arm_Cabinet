@@ -38,11 +38,12 @@ class SpotCurtainEnvCfg(DirectRLEnvCfg):
     root = os.getcwd()
     # robot need to change
     robot_cfg: ArticulationCfg = SPOT_CFG.replace(prim_path="/World/envs/env_.*/Robot")
-    robot_cfg.spawn.usd_path = root + '/asset/spot/spot.usd'
+    robot_cfg.spawn.usd_path = root + '/asset/other_spot/spot_arm_cam_armee.usda'
     robot_cfg.init_state.pos = (-0.05, 1.6, 0.4)
+    robot_cfg.spawn.activate_contact_sensors = False
 
     camera_cfg: CameraCfg = CameraCfg(
-        prim_path="/World/envs/env_.*/Robot/body/center_camera/center_camera", #/spot/center_camera/center_camera
+        prim_path="/World/envs/env_.*/Robot/spot_arm/body/center_camera/center_camera", #/spot/center_camera/center_camera
         update_period=0.1,
         height=480,
         width=640,
@@ -90,19 +91,14 @@ class SpotCurtainEnv( DirectRLEnv):
         self.ee_idx = self.robot.find_bodies("arm_ee")[0][0]
         self._ee_name = 'arm0_link_ee'
         self.controller.init_ctrl(self._ee_name,self.robot.body_names,self.robot.joint_names)
-    
-    def _post_setup_scene(self):
-        """Called after scene setup is complete and physics views are created."""
-        # Initialize robot-specific properties
-        self.ee_idx = self.robot.find_bodies("arm_ee")[0][0]
-        self.controller.init_ctrl(self._ee_name, self.robot.body_names, self.robot.joint_names)
 
 
     def _setup_scene(self,) :
         from isaaclab.sim.spawners.from_files import spawn_from_usd
-        self.robot = Articulation(self.cfg.robot_cfg)
+        
+        self.robot = Articulation(self.cfg.robot_cfg)        
         self._camera = Camera(self.cfg.camera_cfg)
-
+        
         spawn_ground_plane(prim_path="/World/ground", cfg=GroundPlaneCfg())
 
         # Spawn cabinet directly 
@@ -183,14 +179,20 @@ class SpotCurtainEnv( DirectRLEnv):
         arm_comd =None
         if self.actions[:,3:].any()!=0:
             arm_comd = self.actions[:,3:]
-            #TODO currently arm_comd include gripper command, maby need to separate them later and send to controller seperately
 
         # do not set the base_pose if arm related to body frame
-        action,index,_ = self.controller.compute(lin_vel, ang_vel,  gravity_b,
+        action,index,success = self.controller.compute(lin_vel, ang_vel,  gravity_b,
                                                   current_joint_pos, current_joint_vel,
-                                                  body_state_w,  # ,y,x
+                                                  body_state_w,
                                                   self.actions[:,:3],
-                                                  arm_comd) #, success
+                                                  arm_comd) #arm & gripper
+        
+        if len(index) > len(self.controller.arm_idxs):
+            gripper_start_idx = len(self.controller.arm_idxs) #TODO the real Gripper Joints indicees have still to identified
+            gripper_actions = action[:, gripper_start_idx:]
+            if torch.any(gripper_actions != 0):
+                print(f"🤏 Applying gripper actions: {gripper_actions}")
+        
         self.robot_dof_targets[:, index] = action
         limit = self.robot.data.joint_pos_limits[:, :, :]
         self.robot_dof_targets = torch.clamp(self.robot_dof_targets, limit[:, :, 0], limit[:, :, 1])

@@ -49,6 +49,7 @@ class LocomotionController:
         # 'arm0_sh1', 'fl_hy', 'fr_hy', 'hl_hy', 'hr_hy',
         # 'arm0_el0', 'fl_kn', 'fr_kn', 'hl_kn', 'hr_kn',
         # 'arm0_el1', 'arm0_wr0', 'arm0_wr1', 'arm0_f1x']
+        # 'arm0_fngr' added
         self._default_joint_pos = torch.tensor([0.1, -0.1, 0.1, -0.1,
                                             0.9, 0.9, 1.1, 1.1,
                                             -1.5, -1.5, -1.5, -1.5,

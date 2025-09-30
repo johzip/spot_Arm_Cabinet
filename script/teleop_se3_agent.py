@@ -65,12 +65,6 @@ def main():
 
     # create environment
     env = gym.make(args_cli.task, cfg=env_cfg,render_mode="rgb_array" if args_cli.enable_cameras else None)
-    # check environment name (for reach , we don't allow the gripper)
-    print(f" before Cabinet? ")
-    if "Curtain" in args_cli.task:
-        omni.log.warn(
-            f"The environment '{args_cli.task}' does not support gripper control. The device command will be ignored."
-        )
 
     # create controller
     #lower()converts all uppercase characters in a string to their lowercase equivalents

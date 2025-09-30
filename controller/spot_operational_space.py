@@ -55,11 +55,21 @@ class OperationSpaceController:
         self.base_idxs = string_utils.resolve_matching_names(base_body_name, joint_names, True)[0] #[self.robot.find_joints(name)[0][0] for name in body_name]
         self.arm_idxs = string_utils.resolve_matching_names('arm0_.*', joint_names, )[0]#self.robot.find_joints('arm0_.*')[0]
         
+        # Print all joint names
+        print(f"All joint names: {joint_names}")
         # Print arm0_ joint names and indices
-        #arm_joint_names = [joint_names[idx] for idx in self.arm_idxs]
-        #print(f"Arm0 joints - Names: {arm_joint_names}, Indices: {self.arm_idxs}")
+        arm_joint_names = [joint_names[idx] for idx in self.arm_idxs]
+        print(f"Arm0 joints - Names: {arm_joint_names}, Indices: {self.arm_idxs}")
+        #arm0_f1x gripper close open
 
 
+    def _get_gripper_indices(self):
+        """Get gripper joint indices. You'll need to implement this based on your robot."""
+        # For now, return placeholder - you'll need to find actual gripper joint names
+        if not hasattr(self, 'gripper_idxs'):
+            # This should be set in init_ctrl - add gripper detection there
+            self.gripper_idxs = []  # Empty for now
+        return self.gripper_idxs
 
 
     def compute(self,
@@ -93,13 +103,7 @@ class OperationSpaceController:
 
             arm_pose_command = arm_command[:,:3].cpu().numpy()
             arm_rot_command = arm_command[:,3:6].cpu().numpy()
-            
-            #TODO
-            #if arm_command.shape[1] > 6:
-            #    gripper_command = arm_command[:,6:].cpu().numpy()  # Gripper commands
-            #    print(f"🤏 Gripper commands received: {gripper_command}")
-            #else:
-            #    gripper_command = None
+            gripper_command = arm_command[:,6:].cpu().numpy()
         
             # not add rot command
             arm_rot_command = [arm_rot_command[i]  if arm_rot_command[i].any() else None for i in range(self.num_robot)]
@@ -110,25 +114,19 @@ class OperationSpaceController:
                                                                         ee_pose_w[:,3:],
             )
 
-            #TODO
-            #if gripper_command is not None:
-            #    # Find gripper joint indices and apply commands
-            #    gripper_joint_indices = self.get_gripper_joint_indices()  # You need to implement this
-            #    
-            #    # Combine arm and gripper actions
-            #    combined_action = torch.zeros((self.num_robot, len(self.arm_idxs) + len(gripper_joint_indices)))
-            #    combined_action[:, :len(self.arm_idxs)] = torch.from_numpy(arm_joint_act)
-            #    combined_action[:, len(self.arm_idxs):] = torch.from_numpy(gripper_command)
-            #    
-            #    combined_indices = self.arm_idxs + gripper_joint_indices
-            #    
-            #    return combined_action.to(self.device, torch.float32), combined_indices, success
-            '''
-            if success:
-                print(f'success')
-            '''
-            joint_action = torch.from_numpy(arm_joint_act).to(self.device, torch.float32)
-            joint_index = self.arm_idxs
+            if np.any(gripper_command != 0):
+                print(f"🤏 Processing gripper commands: {gripper_command}")
+                
+                # Combine arm + gripper actions
+                combined_action = np.concatenate([arm_joint_act, gripper_command], axis=1)
+                combined_indices = self.arm_idxs + self._get_gripper_indices()
+                
+                joint_action = torch.from_numpy(combined_action).to(self.device, torch.float32)
+                joint_index = combined_indices
+            else:
+                # Arm-only action
+                joint_action = torch.from_numpy(arm_joint_act).to(self.device, torch.float32)
+                joint_index = self.arm_idxs
 
 
         return joint_action,joint_index,success

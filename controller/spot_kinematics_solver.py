@@ -43,6 +43,7 @@ class ArticulationKinematicsSolver:
                 robot_description_path=base_path + '/asset/spot.yaml',
                 urdf_path=base_path + '/asset/spot.urdf'
             )
+            
             if ee_name not in kinematics_solver.get_all_frame_names():
                 carb.log_error(
                     "Frame name"

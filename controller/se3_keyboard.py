@@ -131,7 +131,7 @@ class MMKeyboard(DeviceBase):
         # convert to rotation vector
         rot_vec = Rotation.from_euler("XYZ", self._delta_arm_rot).as_rotvec()
         arm_pose = np.concatenate([self._delta_arm_pos, rot_vec])
-        #TODO: replace Gripper act with command, and handle command here
+        
         gripper_command = self._gripper_command.copy()
         base_com = self._delta_base_com.copy()
         self._delta_arm_pos = np.zeros(3)  # (x, y, z)
@@ -158,7 +158,7 @@ class MMKeyboard(DeviceBase):
                 self._finish = True
 
             if event.input.name in ["NUMPAD_7", "NUMPAD_8", "NUMPAD_4", "NUMPAD_5", "NUMPAD_1", "NUMPAD_2"]:
-                #TODO: test this, rework action_map
+                #3: test this, rework action_map
                 self._gripper_command += self._INPUT_KEY_MAPPING[event.input.name]
                 action_map = {
                     "NUMPAD_7": "👐 Open Gripper",

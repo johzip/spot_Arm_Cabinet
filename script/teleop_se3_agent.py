@@ -105,8 +105,8 @@ def main():
             gripper_actions = torch.tensor(gripper_command).to(torch.float).to(device=args_cli.device).reshape(args_cli.num_envs, -1)
         
             
-            # pre-process actions TODO: include gripper command in actions
             actions= torch.concat([base_delta_com, arm_delta_pose, gripper_actions], dim=1)
+            
             #actions= torch.concat([base_delta_com, arm_delta_pose], dim=1)
 
             if finish_flag:

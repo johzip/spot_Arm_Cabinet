@@ -64,20 +64,6 @@ class OperationSpaceController:
         #arm0_f1x gripper close open
 
 
-    def _get_gripper_indices(self):
-        """Get gripper joint indices"""
-        if not hasattr(self, 'gripper_idxs'):
-            # ✅ ONLY the actual gripper joint, not wrist joints!
-            gripper_joint_names = ['arm0_f1x']  # Only gripper open/close
-            self.gripper_idxs = []
-            for joint_name in gripper_joint_names:
-                try:
-                    idx = string_utils.resolve_matching_names(joint_name, self.joint_names, True)[0]
-                    self.gripper_idxs.extend(idx)
-                except:
-                    carb.log_warn(f"Gripper joint {joint_name} not found")
-        return self.gripper_idxs
-
 
     def compute(self,
                 root_lin_vel_b,
@@ -87,12 +73,10 @@ class OperationSpaceController:
                 current_joint_vel,
                 body_state_w,
                 base_command,
-                arm_command = None,
-                gripper_command = None):
+                arm_command = None):
 
         #action = torch.zeros_like(current_joint_pos)
-        if arm_command is None and gripper_command is None:
-            print(f"🤖 Processing arm commands: {arm_command}")
+        if arm_command is None:
             current_base_joints_pos = current_joint_pos[:,self.base_idxs]
 
             current_base_joints_vel = current_joint_vel[:, self.base_idxs]
@@ -103,7 +87,6 @@ class OperationSpaceController:
             joint_index = self.base_idxs
             success = [True] * self.num_robot
         else:
-            print(f"🤖 Processing arm commands: {arm_command}")
             current_arm_joints_pos = current_joint_pos[:, self.arm_idxs]
             ee_pose_w = body_state_w[:, self.ee_idx, 0:7].cpu().numpy()
             robot_base_pose = body_state_w[:, self.base_idx, 0:7].cpu().numpy()
@@ -122,23 +105,9 @@ class OperationSpaceController:
                                                                         ee_pose_w[:,:3] + arm_pose_command, #,y,x
                                                                         ee_pose_w[:,3:],
             )
-
-            if gripper_command is not None and torch.any(gripper_command != 0):
-                print(f"🤏 Processing gripper commands: {gripper_command}")
-                gripper_command_np = gripper_command.cpu().numpy()
-                
-                # Combine arm + gripper actions
-                #TODO Action for gripper open close: from 0.0 (closed) to -90.0 (opened) arm0_f1x Joint
-                gripper_joint_angles = np.clip(gripper_command_np[:, 0:1] * -90.0, -90.0, 0.0)
-                combined_action = np.concatenate([arm_joint_act, gripper_joint_angles], axis=1)
-                combined_indices = self.arm_idxs
-                
-                joint_action = torch.from_numpy(combined_action).to(self.device, torch.float32)
-                joint_index = combined_indices
-            else:
-                # Arm-only action
-                joint_action = torch.from_numpy(arm_joint_act).to(self.device, torch.float32)
-                joint_index = self.arm_idxs
+        
+            joint_action = torch.from_numpy(arm_joint_act).to(self.device, torch.float32)
+            joint_index = self.arm_idxs
 
 
         return joint_action,joint_index,success

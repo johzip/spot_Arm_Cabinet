@@ -184,28 +184,47 @@ class SpotCurtainEnv( DirectRLEnv):
         arm_comd = None
         gripper_comd = None
         if self.actions[:,3:].any()!=0:
-            arm_comd = self.actions[:,3:11]  # arm position (3) + arm rotation (3)
-            gripper_comd = self.actions[:,11:]  # gripper_open + wrist_rot + wrist_pitch
+            arm_comd = self.actions[:,3:9]  # arm position (3) + arm rotation (3)
+            gripper_comd = self.actions[:,9:]  # gripper_open + wrist_rot + wrist_pitch
 
         # do not set the base_pose if arm related to body frame
         action,index,success = self.controller.compute(lin_vel, ang_vel,  gravity_b,
                                                   current_joint_pos, current_joint_vel,
                                                   body_state_w,
                                                   self.actions[:,:3],
-                                                  arm_comd,
-                                                  gripper_comd) #arm & gripper
-        
-        print(f"Action shape: {action.shape}")
-        print(f"Index length: {len(index)}")
-        print(f"robot_dof_targets shape: {self.robot_dof_targets.shape}")
-        print(f"Index values: {index}")
-        if len(index) > len(self.controller.arm_idxs):
-            gripper_start_idx = 9  # Start after base(3) + arm_pos(3) + arm_rot(3)
-            gripper_actions = action[:, gripper_start_idx:]
-            if torch.any(gripper_actions != 0):
-                print(f"🤏 Applying gripper actions: {gripper_actions}")
+                                                  arm_comd) #arm 
         
         self.robot_dof_targets[:, index] = action
+
+        if gripper_comd is not None and torch.any(gripper_comd != 0):
+            print(f"🤏 Applying gripper commands directly: {gripper_comd}")
+            
+            # Find joint indices for wrist and gripper
+            joint_names = self.robot.joint_names
+            wr0_idx = joint_names.index('arm0_wr0') if 'arm0_wr0' in joint_names else None
+            wr1_idx = joint_names.index('arm0_wr1') if 'arm0_wr1' in joint_names else None  
+            f1x_idx = joint_names.index('arm0_f1x') if 'arm0_f1x' in joint_names else None
+            
+            # Apply gripper commands directly
+            if f1x_idx is not None:
+                # gripper_comd[:, 0] = open/close command (-1 to 1)
+                # Map to joint range: -1 → -90°, 0 → -45°, 1 → 0°
+                gripper_angle = torch.clamp(gripper_comd[:, 0] * -45.0 - 45.0, -90.0, 0.0)
+                self.robot_dof_targets[:, f1x_idx] = torch.deg2rad(gripper_angle)
+                
+            if wr0_idx is not None and gripper_comd.shape[1] > 1:
+                # gripper_comd[:, 1] = wrist rotation around X-axis
+                wrist_rotation = gripper_comd[:, 1] * 0.1  # Scale rotation command
+                current_wr0 = current_joint_pos[:, wr0_idx]
+                self.robot_dof_targets[:, wr0_idx] = current_wr0 + wrist_rotation
+                
+            if wr1_idx is not None and gripper_comd.shape[1] > 2:
+                # gripper_comd[:, 2] = wrist pitch
+                wrist_pitch = gripper_comd[:, 2] * 0.1  # Scale pitch command  
+                current_wr1 = current_joint_pos[:, wr1_idx]
+                self.robot_dof_targets[:, wr1_idx] = current_wr1 + wrist_pitch
+
+        # ✅ Apply joint limits
         limit = self.robot.data.joint_pos_limits[:, :, :]
         self.robot_dof_targets = torch.clamp(self.robot_dof_targets, limit[:, :, 0], limit[:, :, 1])
 

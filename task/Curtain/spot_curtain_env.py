@@ -167,7 +167,12 @@ class SpotCurtainEnv( DirectRLEnv):
 
 
     def _pre_physics_step(self, actions):
-
+        #actions = [
+        #    base_x,    base_y,    base_yaw,     # Base movement (3D)
+        #    arm_x,     arm_y,     arm_z,        # Arm position delta (3D)  
+        #    arm_rx,    arm_ry,    arm_rz,       # Arm rotation delta (3D)
+        #    gripper_open, wrist_rot, wrist_pitch # Gripper/wrist commands (3D)
+        #]
 
         self.actions = actions.clone().to(self.sim.device)
         lin_vel = self.robot.data.root_lin_vel_b
@@ -176,19 +181,26 @@ class SpotCurtainEnv( DirectRLEnv):
         current_joint_pos = self.robot.data.joint_pos
         current_joint_vel = self.robot.data.joint_vel
         body_state_w = self.robot.data.body_state_w
-        arm_comd =None
+        arm_comd = None
+        gripper_comd = None
         if self.actions[:,3:].any()!=0:
-            arm_comd = self.actions[:,3:]
+            arm_comd = self.actions[:,3:11]  # arm position (3) + arm rotation (3)
+            gripper_comd = self.actions[:,11:]  # gripper_open + wrist_rot + wrist_pitch
 
         # do not set the base_pose if arm related to body frame
         action,index,success = self.controller.compute(lin_vel, ang_vel,  gravity_b,
                                                   current_joint_pos, current_joint_vel,
                                                   body_state_w,
                                                   self.actions[:,:3],
-                                                  arm_comd) #arm & gripper
+                                                  arm_comd,
+                                                  gripper_comd) #arm & gripper
         
+        print(f"Action shape: {action.shape}")
+        print(f"Index length: {len(index)}")
+        print(f"robot_dof_targets shape: {self.robot_dof_targets.shape}")
+        print(f"Index values: {index}")
         if len(index) > len(self.controller.arm_idxs):
-            gripper_start_idx = len(self.controller.arm_idxs) #TODO the real Gripper Joints indicees have still to identified
+            gripper_start_idx = 9  # Start after base(3) + arm_pos(3) + arm_rot(3)
             gripper_actions = action[:, gripper_start_idx:]
             if torch.any(gripper_actions != 0):
                 print(f"🤏 Applying gripper actions: {gripper_actions}")

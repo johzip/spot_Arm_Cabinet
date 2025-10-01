@@ -38,12 +38,12 @@ class SpotCurtainEnvCfg(DirectRLEnvCfg):
     root = os.getcwd()
     # robot need to change
     robot_cfg: ArticulationCfg = SPOT_CFG.replace(prim_path="/World/envs/env_.*/Robot")
-    robot_cfg.spawn.usd_path = root + '/asset/other_spot/spot_arm_cam_armee.usda'
+    robot_cfg.spawn.usd_path = root + '/asset/spot/spot_joint.usd'
     robot_cfg.init_state.pos = (-0.05, 1.6, 0.4)
     robot_cfg.spawn.activate_contact_sensors = False
 
     camera_cfg: CameraCfg = CameraCfg(
-        prim_path="/World/envs/env_.*/Robot/spot_arm/body/center_camera/center_camera", #/spot/center_camera/center_camera
+        prim_path="/World/envs/env_.*/Robot/spot/body/center_camera/center_camera", #/spot/center_camera/center_camera
         update_period=0.1,
         height=480,
         width=640,

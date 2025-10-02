@@ -207,22 +207,46 @@ class SpotCurtainEnv( DirectRLEnv):
             
             # Apply gripper commands directly
             if f1x_idx is not None:
-                # gripper_comd[:, 0] = open/close command (-1 to 1)
-                # Map to joint range: -1 → -90°, 0 → -45°, 1 → 0°
-                gripper_angle = torch.clamp(gripper_comd[:, 0] * -45.0 - 45.0, -90.0, 0.0)
-                self.robot_dof_targets[:, f1x_idx] = torch.deg2rad(gripper_angle)
+                gripper_step = gripper_comd[:, 0] * 5.0  # Increased to 5° per step
+                current_f1x = current_joint_pos[:, f1x_idx]
+                
+                # Apply incremental movement
+                new_f1x = current_f1x + torch.deg2rad(gripper_step)
+                
+                # Clamp to joint limits: -90° to 0°
+                self.robot_dof_targets[:, f1x_idx] = torch.clamp(
+                    new_f1x, 
+                    torch.deg2rad(torch.tensor(-90.0, device=self.sim.device)), 
+                    torch.deg2rad(torch.tensor(0.0, device=self.sim.device))
+                )
                 
             if wr0_idx is not None and gripper_comd.shape[1] > 1:
-                # gripper_comd[:, 1] = wrist rotation around X-axis
-                wrist_rotation = gripper_comd[:, 1] * 0.1  # Scale rotation command
+                wrist_rotation_step = gripper_comd[:, 1] * 3.0  # Tripled from 1.0 to 3.0
                 current_wr0 = current_joint_pos[:, wr0_idx]
-                self.robot_dof_targets[:, wr0_idx] = current_wr0 + wrist_rotation
+                
+                # Apply incremental movement
+                new_wr0 = current_wr0 + torch.deg2rad(wrist_rotation_step)
+                
+                # Clamp to joint limits: -105° to 105°
+                self.robot_dof_targets[:, wr0_idx] = torch.clamp(
+                    new_wr0,
+                    torch.deg2rad(torch.tensor(-105.0, device=self.sim.device)),
+                    torch.deg2rad(torch.tensor(105.0, device=self.sim.device))
+                )
                 
             if wr1_idx is not None and gripper_comd.shape[1] > 2:
-                # gripper_comd[:, 2] = wrist pitch
-                wrist_pitch = gripper_comd[:, 2] * 0.1  # Scale pitch command  
+                wrist_pitch_step = gripper_comd[:, 2] * 3.0  # Reduced step size
                 current_wr1 = current_joint_pos[:, wr1_idx]
-                self.robot_dof_targets[:, wr1_idx] = current_wr1 + wrist_pitch
+                
+                # Apply incremental movement
+                new_wr1 = current_wr1 + torch.deg2rad(wrist_pitch_step)
+                
+                # Clamp to joint limits: -165° to 165°
+                self.robot_dof_targets[:, wr1_idx] = torch.clamp(
+                    new_wr1,
+                    torch.deg2rad(torch.tensor(-165.0, device=self.sim.device)),
+                    torch.deg2rad(torch.tensor(165.0, device=self.sim.device))
+                )
 
         # ✅ Apply joint limits
         limit = self.robot.data.joint_pos_limits[:, :, :]

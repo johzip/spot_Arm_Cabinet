@@ -45,6 +45,7 @@ class OperationSpaceController:
         return
 
     def init_ctrl(self,ee_names,body_names,joint_names):
+        self.joint_names = joint_names
         if isinstance(ee_names, str):
             ee_names = [ee_names] * self.num_robot
         self.arm_ctrl.intial_multi_solver(ee_names)
@@ -54,7 +55,13 @@ class OperationSpaceController:
                      'hl_kn', 'hr_kn']
         self.base_idxs = string_utils.resolve_matching_names(base_body_name, joint_names, True)[0] #[self.robot.find_joints(name)[0][0] for name in body_name]
         self.arm_idxs = string_utils.resolve_matching_names('arm0_.*', joint_names, )[0]#self.robot.find_joints('arm0_.*')[0]
-
+        
+        # Print all joint names
+        print(f"All joint names: {joint_names}")
+        # Print arm0_ joint names and indices
+        arm_joint_names = [joint_names[idx] for idx in self.arm_idxs]
+        print(f"Arm0 joints - Names: {arm_joint_names}, Indices: {self.arm_idxs}")
+        #arm0_f1x gripper close open
 
 
 
@@ -83,11 +90,13 @@ class OperationSpaceController:
             current_arm_joints_pos = current_joint_pos[:, self.arm_idxs]
             ee_pose_w = body_state_w[:, self.ee_idx, 0:7].cpu().numpy()
             robot_base_pose = body_state_w[:, self.base_idx, 0:7].cpu().numpy()
+
             self.arm_ctrl.set_robot_base_pose(robot_base_pose[:,:3], robot_base_pose[:,3:])
             current_arm_joints_pos = current_arm_joints_pos.cpu().numpy()
 
             arm_pose_command = arm_command[:,:3].cpu().numpy()
             arm_rot_command = arm_command[:,3:6].cpu().numpy()
+        
             # not add rot command
             arm_rot_command = [arm_rot_command[i]  if arm_rot_command[i].any() else None for i in range(self.num_robot)]
             #print(f'ee position is {ee_pose_w[:,:3]},command is {arm_pose_command}')
@@ -96,10 +105,7 @@ class OperationSpaceController:
                                                                         ee_pose_w[:,:3] + arm_pose_command, #,y,x
                                                                         ee_pose_w[:,3:],
             )
-            '''
-            if success:
-                print(f'success')
-            '''
+        
             joint_action = torch.from_numpy(arm_joint_act).to(self.device, torch.float32)
             joint_index = self.arm_idxs
 

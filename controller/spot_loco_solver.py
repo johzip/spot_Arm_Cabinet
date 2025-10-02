@@ -44,11 +44,17 @@ class LocomotionController:
         self._base_vel_lin_scale = 1
         self._base_vel_ang_scale = 1
         self._action_scale = 0.2
-
+        #['fl_hx', 'fr_hx', 'hl_hx', 'hr_hx', 
+        #'arm0_sh0', 'fl_hy', 'fr_hy', 'hl_hy', 
+        # 'hr_hy', 'arm0_sh1', 'fl_kn', 'fr_kn', 
+        # 'hl_kn', 'hr_kn', 'arm0_el0', 'arm0_el1', 
+        # 'arm0_wr0', 'arm0_wr1', 'arm0_fngr']
+        
         #['arm0_sh0', 'fl_hx', 'fr_hx', 'hl_hx','hr_hx',
         # 'arm0_sh1', 'fl_hy', 'fr_hy', 'hl_hy', 'hr_hy',
         # 'arm0_el0', 'fl_kn', 'fr_kn', 'hl_kn', 'hr_kn',
         # 'arm0_el1', 'arm0_wr0', 'arm0_wr1', 'arm0_f1x']
+        # 'arm0_fngr' added
         self._default_joint_pos = torch.tensor([0.1, -0.1, 0.1, -0.1,
                                             0.9, 0.9, 1.1, 1.1,
                                             -1.5, -1.5, -1.5, -1.5,

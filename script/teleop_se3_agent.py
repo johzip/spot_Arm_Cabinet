@@ -65,12 +65,6 @@ def main():
 
     # create environment
     env = gym.make(args_cli.task, cfg=env_cfg,render_mode="rgb_array" if args_cli.enable_cameras else None)
-    # check environment name (for reach , we don't allow the gripper)
-    print(f" before Cabinet? ")
-    if "Curtain" in args_cli.task:
-        omni.log.warn(
-            f"The environment '{args_cli.task}' does not support gripper control. The device command will be ignored."
-        )
 
     # create controller
     #lower()converts all uppercase characters in a string to their lowercase equivalents
@@ -93,6 +87,7 @@ def main():
     teleop_interface.reset()
 
     #actions = torch.zeros_like(env.actions)
+    print(f"env.action_space.shape: {env.action_space.shape}")
     actions = torch.zeros(env.action_space.shape, dtype=torch.float32, device=args_cli.device)
 
     # simulate environment
@@ -102,12 +97,17 @@ def main():
             obs_dict = env.step(actions)[0]
             obs = obs_dict["rgb"]
 
-            arm_delta_pose, gripper_command, base_delta_com,finish_flag = teleop_interface.advance()
+            arm_delta_pose, gripper_command, base_delta_com, finish_flag = teleop_interface.advance()
+
             arm_delta_pose = torch.tensor(arm_delta_pose).to(torch.float).to(device=args_cli.device).reshape(args_cli.num_envs,-1)
             base_delta_com = torch.tensor(base_delta_com).to(torch.float).to(device=args_cli.device).reshape(args_cli.num_envs,-1)
-
-            # pre-process actions
-            actions= torch.concat([base_delta_com,arm_delta_pose], dim=1)
+            
+            gripper_actions = torch.tensor(gripper_command).to(torch.float).to(device=args_cli.device).reshape(args_cli.num_envs, -1)
+        
+            
+            actions= torch.concat([base_delta_com, arm_delta_pose, gripper_actions], dim=1)
+            
+            #actions= torch.concat([base_delta_com, arm_delta_pose], dim=1)
 
             if finish_flag:
                 env.close()

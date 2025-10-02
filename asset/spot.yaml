@@ -13,8 +13,9 @@ cspace:
     - arm0_el1
     - arm0_wr0
     - arm0_wr1
+    - arm0_f1x
 default_q: [
-    -0.0,0.0008,0.0006,-0.0013,0.0009,-0.0004,
+    -0.0,0.0008,0.0006,-0.0013,0.0009,-0.0004,-0.02,
 ]
 
 # Most dimensions of the cspace have a direct corresponding element

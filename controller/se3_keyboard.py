@@ -177,7 +177,7 @@ class MMKeyboard(DeviceBase):
     def _create_key_bindings(self):
         """Creates default key binding."""
         self._INPUT_KEY_MAPPING = {
-
+            #TODO: add better wrist and gripper sensitivety scaling HERE
             # gripper open close command
             "NUMPAD_7": np.asarray([1.0, 0.0, 0.0]) * self.gripper_sen,
             "NUMPAD_8": np.asarray([-1.0, 0.0, 0.0]) * self.gripper_sen,

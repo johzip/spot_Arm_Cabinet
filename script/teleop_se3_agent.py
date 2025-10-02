@@ -129,8 +129,15 @@ def main():
             
             if suggested_action is not None:
                 # Convert OpenVLA action to robot format (you'll need to implement this conversion)
-                #TODO: use the suggested action to control the robot
-                actions = torch.concat([base_delta_com, arm_delta_pose,gripper_actions], dim=1)
+                # 7-DoF end-effector deltas of the form (x,             y,          z,              roll,       pitch,      yaw,      gripper )
+                #Example suggested_action fromOpenVLA: [-0.00020879, -0.00042412,  0.00703386,  0.00049971, -0.00747924, -0.00167851,   0.    ]
+                
+                #TODO: if x,y,z is in arm reach then perform arm movement only (this is the neccesary part)
+                #TODO: if x,y,z is out of arm reach then perform base movement instead of arm movement (advanced)
+                #TODO: translate  roll, pitch, yaw, in wrist wr0 and wr1 movement OR implement self._delta_arm_rot = np.zeros(3)  # (roll, pitch, yaw) usage instead
+                #TODO: translate gripper value into gripper commands
+                
+                actions = torch.concat([base_delta_com, arm_delta_pose, gripper_actions], dim=1)
             else:
                 # Manual control
                 actions = torch.concat([base_delta_com, arm_delta_pose, gripper_actions], dim=1)

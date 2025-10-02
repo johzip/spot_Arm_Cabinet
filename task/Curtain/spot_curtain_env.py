@@ -203,6 +203,7 @@ class SpotCurtainEnv( DirectRLEnv):
             wr1_idx = joint_names.index('arm0_wr1') if 'arm0_wr1' in joint_names else None  
             f1x_idx = joint_names.index('arm0_f1x') if 'arm0_f1x' in joint_names else None
             
+            #TODO: remove sensitivety scaling HERE
             # Apply gripper commands directly
             if f1x_idx is not None:
                 gripper_step = gripper_comd[:, 0] * 5.0  # Increased to 5° per step

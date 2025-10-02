@@ -137,8 +137,6 @@ class MMKeyboard(DeviceBase):
         self._delta_arm_pos = np.zeros(3)  # (x, y, z)
         self._delta_arm_rot = np.zeros(3)  # (roll, pitch, yaw)
 
-        #self._value = None
-
         # return the command and gripper state
         return arm_pose, gripper_command, base_com, self._finish
 
@@ -158,29 +156,14 @@ class MMKeyboard(DeviceBase):
                 self._finish = True
 
             if event.input.name in ["NUMPAD_7", "NUMPAD_8", "NUMPAD_4", "NUMPAD_5", "NUMPAD_1", "NUMPAD_2"]:
-                #3: test this, rework action_map
                 self._gripper_command += self._INPUT_KEY_MAPPING[event.input.name]
-                action_map = {
-                    "NUMPAD_7": "👐 Open Gripper",
-                    "NUMPAD_8": "🤏 Close Gripper", 
-                    "NUMPAD_4": "🔄 Rotating wrist CCW",
-                    "NUMPAD_5": "🔄 Rotating wrist CW", 
-                    "NUMPAD_1": "↗️ Tipping wrist up",
-                    "NUMPAD_2": "↘️ Tipping wrist down"
-                }
-                print(action_map.get(event.input.name, "Wrist movement"))
 
             elif event.input.name in ["W", "S", "A", "D", "Z", "X"]:
                 self._value = event.input.name
                 self._delta_arm_pos += self._INPUT_KEY_MAPPING[event.input.name]
-            #elif event.input.name in ["Z", "X", "T", "G", "C", "V"]:
-            #    self._delta_arm_rot += self._INPUT_KEY_MAPPING[event.input.name]
             elif event.input.name in ["UP", "DOWN", "LEFT", "RIGHT", "M", "N"]:
                 self._delta_base_com += self._INPUT_KEY_MAPPING[event.input.name]
                 self._value = event.input.name
-
-        # remove the command when un-pressed
-
         if event.type == carb.input.KeyboardEventType.KEY_RELEASE:
             if event.input.name in ["UP", "DOWN", "LEFT", "RIGHT", "M", "N"]:
                 self._delta_base_com -= self._INPUT_KEY_MAPPING[event.input.name]
@@ -225,16 +208,3 @@ class MMKeyboard(DeviceBase):
             "M": np.asarray([0.0, 0.0, 1.0]) * self.base_com_sen,
             "N": np.asarray([0.0, 0.0, -1.0]) * self.base_com_sen,
         }
-
-        '''
-        # roll (around x-axis) for arm
-        "Z": np.asarray([1.0, 0.0, 0.0]) * self.arm_rot_sen,
-        "X": np.asarray([-1.0, 0.0, 0.0]) * self.arm_rot_sen,
-        # pitch (around y-axis) for arm
-        "T": np.asarray([0.0, 1.0, 0.0]) * self.arm_rot_sen,
-        "G": np.asarray([0.0, -1.0, 0.0]) * self.arm_rot_sen,
-        # yaw (around z-axis) for arm
-        "C": np.asarray([0.0, 0.0, 1.0]) * self.arm_rot_sen,
-        "V": np.asarray([0.0, 0.0, -1.0]) * self.arm_rot_sen,
-        '''
-

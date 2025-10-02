@@ -56,14 +56,6 @@ class OperationSpaceController:
         self.base_idxs = string_utils.resolve_matching_names(base_body_name, joint_names, True)[0] #[self.robot.find_joints(name)[0][0] for name in body_name]
         self.arm_idxs = string_utils.resolve_matching_names('arm0_.*', joint_names, )[0]#self.robot.find_joints('arm0_.*')[0]
         
-        # Print all joint names
-        print(f"All joint names: {joint_names}")
-        # Print arm0_ joint names and indices
-        arm_joint_names = [joint_names[idx] for idx in self.arm_idxs]
-        print(f"Arm0 joints - Names: {arm_joint_names}, Indices: {self.arm_idxs}")
-        #arm0_f1x gripper close open
-
-
 
     def compute(self,
                 root_lin_vel_b,

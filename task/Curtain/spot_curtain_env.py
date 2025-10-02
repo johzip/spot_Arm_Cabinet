@@ -196,9 +196,7 @@ class SpotCurtainEnv( DirectRLEnv):
         
         self.robot_dof_targets[:, index] = action
 
-        if gripper_comd is not None and torch.any(gripper_comd != 0):
-            print(f"🤏 Applying gripper commands directly: {gripper_comd}")
-            
+        if gripper_comd is not None and torch.any(gripper_comd != 0):            
             # Find joint indices for wrist and gripper
             joint_names = self.robot.joint_names
             wr0_idx = joint_names.index('arm0_wr0') if 'arm0_wr0' in joint_names else None
@@ -248,7 +246,6 @@ class SpotCurtainEnv( DirectRLEnv):
                     torch.deg2rad(torch.tensor(165.0, device=self.sim.device))
                 )
 
-        # ✅ Apply joint limits
         limit = self.robot.data.joint_pos_limits[:, :, :]
         self.robot_dof_targets = torch.clamp(self.robot_dof_targets, limit[:, :, 0], limit[:, :, 1])
 

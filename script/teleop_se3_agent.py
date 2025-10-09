@@ -102,8 +102,8 @@ def main():
     while simulation_app.is_running():
         with torch.inference_mode():
             
-            if torch.any(actions != 0.0):
-                print(f"Action: {actions}")
+            #if torch.any(actions != 0.0):
+            #    print(f"Action: {actions}")
             obs_dict = env.step(actions)[0] 
             obs = obs_dict["rgb"]
 
@@ -136,7 +136,7 @@ def main():
                 #TODO: if x,y,z is out of arm reach then perform base movement instead of arm movement (advanced)
                 #TODO: translate  roll, pitch, yaw, in wrist wr0 and wr1 movement OR implement self._delta_arm_rot = np.zeros(3)  # (roll, pitch, yaw) usage instead
                 #TODO: translate gripper value into gripper commands
-                
+
                 openvla_x, openvla_y, openvla_z = suggested_action[0], suggested_action[1], suggested_action[2]
                 openvla_roll, openvla_pitch, openvla_yaw = suggested_action[3], suggested_action[4], suggested_action[5]
                 openvla_gripper = suggested_action[6]

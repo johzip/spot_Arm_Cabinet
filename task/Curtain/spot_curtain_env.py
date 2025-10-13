@@ -315,18 +315,18 @@ class SpotCurtainEnv( DirectRLEnv):
         self.arm_ee_pos_w = body_state_w[:, self.ee_idx, 0:3]
         self.arm_ee_quat_w = body_state_w[:, self.ee_idx, 3:7]
 
-        if(self.vla_mode):
-            transformed_arm_cmd, transformed_gripper_cmd = self.apply_vla_command_with_transformation(actions)
-            print(f'Original arm cmd: {actions[:,3:9]}')
-            print(f'Transformed arm cmd: {transformed_arm_cmd}')
-            # Use transformed commands instead of manual control
-            arm_delta_pose = transformed_arm_cmd
-            gripper_actions = transformed_gripper_cmd
-        
-            # Keep base at zero for VLA commands
-            ai_base_delta = torch.zeros(self.num_envs, 3, device=self.device)
-            
-            actions = torch.concat([ai_base_delta, arm_delta_pose, gripper_actions], dim=1)
+        #if(self.vla_mode):
+        #    transformed_arm_cmd, transformed_gripper_cmd = self.apply_vla_command_with_transformation(actions)
+        #    print(f'Original arm cmd: {actions[:,3:9]}')
+        #    print(f'Transformed arm cmd: {transformed_arm_cmd}')
+        #    # Use transformed commands instead of manual control
+        #    arm_delta_pose = transformed_arm_cmd
+        #    gripper_actions = transformed_gripper_cmd
+        #
+        #    # Keep base at zero for VLA commands
+        #    ai_base_delta = torch.zeros(self.num_envs, 3, device=self.device)
+        #    
+        #    actions = torch.concat([ai_base_delta, arm_delta_pose, gripper_actions], dim=1)
 
 
         self.actions = actions.clone().to(self.sim.device)

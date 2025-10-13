@@ -119,8 +119,7 @@ def main():
                 env.unwrapped.enable_vla_mode()
                 
                 openvla_counter += 1
-                if openvla_counter % 100 == 0:  # Every 100 steps, get OpenVLA suggestion
-                    print("🤖 Getting OpenVLA suggestion...")
+                if openvla_counter % 5 == 0:  # Every 100 steps, get OpenVLA suggestion
                     suggested_action = openvla_assistant.get_action_suggestion(obs, args_cli.openvla_prompt)
                     if suggested_action is not None:
                         print(f"🤖 OpenVLA suggests: {suggested_action}")
@@ -137,44 +136,62 @@ def main():
             #actions= torch.concat([base_delta_com, arm_delta_pose, gripper_actions], dim=1)
             
             if vlaMode:
-                if suggested_action is not None:
+                if suggested_action is None: 
+                    #TODO: suggested_action is only none until openvla gives the first command, but if the command is not good, then we are stuck
                     #TODO: currently there is no command given by vla since the camera pictures dont show any useful information
                     # here should be a command moving the wrist camera to a observation position!
                     # this position should be a position where the wrist is open and angled to the front of the robot.
                     # the arm should be tucked in so the wrist cam is as close to the normal robot camera as possible.
-                    pass
+                    print("🎥 Moving to camera observation position...")
+        
+                    # 7-DoF observation command: (x, y, z, roll, pitch, yaw, gripper)
+                    obs_x = 0.02     # Much smaller forward movement (2cm instead of 10cm)
+                    obs_y = 0.0      # Keep centered
+                    obs_z = -0.02    # Move DOWN slightly (2cm) - tuck arm closer to body
+                    obs_roll = 0.0   # No roll rotation
+                    obs_pitch = 0.2  # Tilt wrist camera UP (positive pitch) to look forward
+                    obs_yaw = 0.0    # No yaw rotation  
+                    obs_gripper = -0.8 # OPEN gripper (negative value opens, positive closes)
                     
-                # Convert OpenVLA action to robot format (you'll need to implement this conversion)
-                # 7-DoF end-effector deltas of the form (x,             y,          z,              roll,       pitch,      yaw,      gripper )
-                #Example suggested_action fromOpenVLA: [-0.00020879, -0.00042412,  0.00703386,  0.00049971, -0.00747924, -0.00167851,   0.    ]
+                    ai_arm_delta = torch.tensor([
+                        [obs_x, obs_y, obs_z, obs_roll, obs_pitch, obs_yaw]
+                    ], device=args_cli.device).repeat(args_cli.num_envs, 1)
+                    
+                    ai_gripper_actions = torch.tensor([
+                        [obs_gripper, 0.0, 0.0]  # gripper open, no wrist movement
+                    ], device=args_cli.device).repeat(args_cli.num_envs, 1)
+                    
+                else:
+                    # Convert OpenVLA action to robot format (you'll need to implement this conversion)
+                    # 7-DoF end-effector deltas of the form (x,             y,          z,              roll,       pitch,      yaw,      gripper )
+                    #Example suggested_action fromOpenVLA: [-0.00020879, -0.00042412,  0.00703386,  0.00049971, -0.00747924, -0.00167851,   0.    ]
+                    
+                    #TODO: if x,y,z is in arm reach then perform arm movement only (this is the neccesary part)
+                    #TODO: if x,y,z is out of arm reach then perform base movement instead of arm movement (advanced)
+                    #TODO: translate  roll, pitch, yaw, in wrist wr0 and wr1 movement OR implement self._delta_arm_rot = np.zeros(3)  # (roll, pitch, yaw) usage instead
+                    #TODO: translate gripper value into gripper commands
+                    openvla_x, openvla_y, openvla_z = suggested_action[0], suggested_action[1], suggested_action[2]
+                    openvla_roll, openvla_pitch, openvla_yaw = suggested_action[3], suggested_action[4], suggested_action[5]
+                    openvla_gripper = suggested_action[6]
+
+                    
+                    # Arm: use OpenVLA's x, y, z for position + zero rotation (or manual rotation)
+                    ai_arm_delta = torch.tensor([
+                        [openvla_x, openvla_y, openvla_z, 0.0, 0.0, 0.0]  # position from AI, rotation from manual
+                    ], device=args_cli.device).repeat(args_cli.num_envs, 1)
+                    
+                    # Gripper: use OpenVLA's roll, yaw, gripper (skip pitch)
+                    ai_gripper_actions = torch.tensor([
+                        [openvla_gripper, openvla_roll, openvla_yaw]  # gripper, wrist_rot, wrist_pitch
+                    ], device=args_cli.device).repeat(args_cli.num_envs, 1)
                 
-                #TODO: if x,y,z is in arm reach then perform arm movement only (this is the neccesary part)
-                #TODO: if x,y,z is out of arm reach then perform base movement instead of arm movement (advanced)
-                #TODO: translate  roll, pitch, yaw, in wrist wr0 and wr1 movement OR implement self._delta_arm_rot = np.zeros(3)  # (roll, pitch, yaw) usage instead
-                #TODO: translate gripper value into gripper commands
 
-                openvla_x, openvla_y, openvla_z = suggested_action[0], suggested_action[1], suggested_action[2]
-                openvla_roll, openvla_pitch, openvla_yaw = suggested_action[3], suggested_action[4], suggested_action[5]
-                openvla_gripper = suggested_action[6]
-
-                # Create robot action components
                 # Base: always zero (no base movement)
-                ai_base_delta = torch.zeros(args_cli.num_envs, 3, device=args_cli.device)
-                
-                # Arm: use OpenVLA's x, y, z for position + zero rotation (or manual rotation)
-                ai_arm_delta = torch.tensor([
-                    [openvla_x, openvla_y, openvla_z, 0.0, 0.0, 0.0]  # position from AI, rotation from manual
-                ], device=args_cli.device).repeat(args_cli.num_envs, 1)
-                
-                # Gripper: use OpenVLA's roll, yaw, gripper (skip pitch)
-                ai_gripper_actions = torch.tensor([
-                    [openvla_gripper, openvla_roll, openvla_yaw]  # gripper, wrist_rot, wrist_pitch
-                ], device=args_cli.device).repeat(args_cli.num_envs, 1)
-                
+                #ai_base_delta = torch.zeros(args_cli.num_envs, 3, device=args_cli.device)
+
                 # Combine AI actions
-                actions = torch.concat([ai_base_delta, ai_arm_delta, ai_gripper_actions], dim=1)
-                print(f"🤖 Using AI control: base=[0,0,0], arm=[{openvla_x:.4f},{openvla_y:.4f},{openvla_z:.4f}], gripper=[{openvla_gripper:.4f},{openvla_roll:.4f},{openvla_yaw:.4f}]")
-    
+                actions = torch.concat([base_delta_com, ai_arm_delta, ai_gripper_actions], dim=1)
+                print(f"🤖 Using AI control: base={base_delta_com[0].tolist()}, arm={ai_arm_delta[0].tolist()}, gripper={ai_gripper_actions[0].tolist()}")
             else:
                 # Manual control
                 actions = torch.concat([base_delta_com, arm_delta_pose, gripper_actions], dim=1)

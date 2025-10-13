@@ -63,6 +63,8 @@ def main():
     """Running keyboard teleoperation with Isaac Lab manipulation environment using OpenVLA to controll the robot."""
     if args_cli.enable_openvla:
         openvla_assistant = OpenVLAAssistant(enabled=args_cli.enable_openvla)
+    else:
+        openvla_assistant = None
 
     # parse configuration
     env_cfg = parse_env_cfg(
@@ -111,13 +113,17 @@ def main():
 
             arm_delta_pose, gripper_command, base_delta_com, finish_flag = teleop_interface.advance()
 
-            if openvla_assistant.ready and obs is not None:
+            if openvla_assistant and openvla_assistant.ready and obs is not None:
+
+                env.unwrapped.enable_vla_mode()
                 openvla_counter += 1
                 if openvla_counter % 100 == 0:  # Every 100 steps, get OpenVLA suggestion
                     print("🤖 Getting OpenVLA suggestion...")
                     suggested_action = openvla_assistant.get_action_suggestion(obs, args_cli.openvla_prompt)
                     if suggested_action is not None:
                         print(f"🤖 OpenVLA suggests: {suggested_action}")
+            else:
+                env.unwrapped.disable_vla_mode()
 
             arm_delta_pose = torch.tensor(arm_delta_pose).to(torch.float).to(device=args_cli.device).reshape(args_cli.num_envs,-1)
             base_delta_com = torch.tensor(base_delta_com).to(torch.float).to(device=args_cli.device).reshape(args_cli.num_envs,-1)
@@ -127,7 +133,7 @@ def main():
             
             #actions= torch.concat([base_delta_com, arm_delta_pose, gripper_actions], dim=1)
             
-            if suggested_action is not None:
+            if suggested_action is not None and openvla_assistant:
                 # Convert OpenVLA action to robot format (you'll need to implement this conversion)
                 # 7-DoF end-effector deltas of the form (x,             y,          z,              roll,       pitch,      yaw,      gripper )
                 #Example suggested_action fromOpenVLA: [-0.00020879, -0.00042412,  0.00703386,  0.00049971, -0.00747924, -0.00167851,   0.    ]
@@ -163,8 +169,6 @@ def main():
                 # Manual control
                 actions = torch.concat([base_delta_com, arm_delta_pose, gripper_actions], dim=1)
 
-            
-            #actions= torch.concat([base_delta_com, arm_delta_pose], dim=1)
 
             if finish_flag:
                 env.close()

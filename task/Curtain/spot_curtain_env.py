@@ -114,7 +114,7 @@ class SpotCurtainEnv( DirectRLEnv):
         from isaaclab.sim.spawners.from_files import spawn_from_usd
         
         self.robot = Articulation(self.cfg.robot_cfg)        
-        self._camera = Camera(self.cfg.camera_cfg)
+        self._camera = Camera(self.cfg.wrist_camera_cfg)
         
         spawn_ground_plane(prim_path="/World/ground", cfg=GroundPlaneCfg())
 
@@ -412,7 +412,7 @@ class SpotCurtainEnv( DirectRLEnv):
     def _get_image_obs(self):
         camera_data = {}
         process = False
-        for data_type in self.cfg.camera_cfg.data_types:
+        for data_type in self.cfg.wrist_camera_cfg.data_types:
             if data_type == "rgb":
                 tem_data = self._camera.data.output[data_type].to(torch.uint8)  # / 255.0  # 【1，480，640，3】
                 if process:

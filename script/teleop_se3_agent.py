@@ -63,8 +63,9 @@ def main():
     """Running keyboard teleoperation with Isaac Lab manipulation environment using OpenVLA to controll the robot."""
     if args_cli.enable_openvla:
         openvla_assistant = OpenVLAAssistant(enabled=args_cli.enable_openvla)
+        vlaMode = True
     else:
-        openvla_assistant = None
+        vlaMode = False
 
     # parse configuration
     env_cfg = parse_env_cfg(
@@ -113,9 +114,10 @@ def main():
 
             arm_delta_pose, gripper_command, base_delta_com, finish_flag = teleop_interface.advance()
 
-            if openvla_assistant and openvla_assistant.ready and obs is not None:
+            if vlaMode and openvla_assistant.ready and obs is not None:
 
                 env.unwrapped.enable_vla_mode()
+                
                 openvla_counter += 1
                 if openvla_counter % 100 == 0:  # Every 100 steps, get OpenVLA suggestion
                     print("🤖 Getting OpenVLA suggestion...")
@@ -124,6 +126,7 @@ def main():
                         print(f"🤖 OpenVLA suggests: {suggested_action}")
             else:
                 env.unwrapped.disable_vla_mode()
+                
 
             arm_delta_pose = torch.tensor(arm_delta_pose).to(torch.float).to(device=args_cli.device).reshape(args_cli.num_envs,-1)
             base_delta_com = torch.tensor(base_delta_com).to(torch.float).to(device=args_cli.device).reshape(args_cli.num_envs,-1)
@@ -133,7 +136,14 @@ def main():
             
             #actions= torch.concat([base_delta_com, arm_delta_pose, gripper_actions], dim=1)
             
-            if suggested_action is not None and openvla_assistant:
+            if vlaMode:
+                if suggested_action is not None:
+                    #TODO: currently there is no command given by vla since the camera pictures dont show any useful information
+                    # here should be a command moving the wrist camera to a observation position!
+                    # this position should be a position where the wrist is open and angled to the front of the robot.
+                    # the arm should be tucked in so the wrist cam is as close to the normal robot camera as possible.
+                    pass
+                    
                 # Convert OpenVLA action to robot format (you'll need to implement this conversion)
                 # 7-DoF end-effector deltas of the form (x,             y,          z,              roll,       pitch,      yaw,      gripper )
                 #Example suggested_action fromOpenVLA: [-0.00020879, -0.00042412,  0.00703386,  0.00049971, -0.00747924, -0.00167851,   0.    ]

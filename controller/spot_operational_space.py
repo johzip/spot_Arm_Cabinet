@@ -91,7 +91,8 @@ class OperationSpaceController:
         
             # not add rot command
             arm_rot_command = [arm_rot_command[i]  if arm_rot_command[i].any() else None for i in range(self.num_robot)]
-            #print(f'ee position is {ee_pose_w[:,:3]},command is {arm_pose_command}')
+            #print(f'current_arm_joints_pos: {current_arm_joints_pos}, ee position is: {ee_pose_w[:,:3]}, command is: {arm_pose_command}. ee_pose_w[:,3:]: {ee_pose_w[:,3:]}')
+            
             arm_joint_act, success = self.arm_ctrl.compute_inverse_kinematics(
                                                                         current_arm_joints_pos,
                                                                         ee_pose_w[:,:3] + arm_pose_command, #,y,x

@@ -140,7 +140,7 @@ def main():
                 openvla_x, openvla_y, openvla_z = suggested_action[0], suggested_action[1], suggested_action[2]
                 openvla_roll, openvla_pitch, openvla_yaw = suggested_action[3], suggested_action[4], suggested_action[5]
                 openvla_gripper = suggested_action[6]
-                
+
                 # Create robot action components
                 # Base: always zero (no base movement)
                 ai_base_delta = torch.zeros(args_cli.num_envs, 3, device=args_cli.device)

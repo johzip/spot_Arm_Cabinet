@@ -136,20 +136,20 @@ def main():
             #actions= torch.concat([base_delta_com, arm_delta_pose, gripper_actions], dim=1)
             
             if vlaMode:
-                if suggested_action is None: 
+                if suggested_action is None or notChanged(suggested_action): 
                     #TODO: suggested_action is only none until openvla gives the first command, but if the command is not good, then we are stuck
                     #TODO: currently there is no command given by vla since the camera pictures dont show any useful information
                     # here should be a command moving the wrist camera to a observation position!
                     # this position should be a position where the wrist is open and angled to the front of the robot.
                     # the arm should be tucked in so the wrist cam is as close to the normal robot camera as possible.
                     print("🎥 Moving to camera observation position...")
-        
+                    # position of robot (-0.05, 1.6, 0.4)
                     # 7-DoF observation command: (x, y, z, roll, pitch, yaw, gripper)
-                    obs_x = 0.02     # Much smaller forward movement (2cm instead of 10cm)
-                    obs_y = 0.0      # Keep centered
-                    obs_z = -0.02    # Move DOWN slightly (2cm) - tuck arm closer to body
+                    obs_x = -0.05    # Much smaller forward movement (2cm instead of 10cm)
+                    obs_y = 1.6     # Keep centered
+                    obs_z = 0.6    # Move DOWN slightly (2cm) - tuck arm closer to body
                     obs_roll = 0.0   # No roll rotation
-                    obs_pitch = 0.2  # Tilt wrist camera UP (positive pitch) to look forward
+                    obs_pitch = 0.0  # Tilt wrist camera UP (positive pitch) to look forward
                     obs_yaw = 0.0    # No yaw rotation  
                     obs_gripper = -0.8 # OPEN gripper (negative value opens, positive closes)
                     
@@ -170,6 +170,7 @@ def main():
                     #TODO: if x,y,z is out of arm reach then perform base movement instead of arm movement (advanced)
                     #TODO: translate  roll, pitch, yaw, in wrist wr0 and wr1 movement OR implement self._delta_arm_rot = np.zeros(3)  # (roll, pitch, yaw) usage instead
                     #TODO: translate gripper value into gripper commands
+                    suggested_action = np.array(suggested_action) * 0.1
                     openvla_x, openvla_y, openvla_z = suggested_action[0], suggested_action[1], suggested_action[2]
                     openvla_roll, openvla_pitch, openvla_yaw = suggested_action[3], suggested_action[4], suggested_action[5]
                     openvla_gripper = suggested_action[6]
@@ -184,7 +185,8 @@ def main():
                     ai_gripper_actions = torch.tensor([
                         [openvla_gripper, openvla_roll, openvla_yaw]  # gripper, wrist_rot, wrist_pitch
                     ], device=args_cli.device).repeat(args_cli.num_envs, 1)
-                
+
+                    
 
                 # Base: always zero (no base movement)
                 #ai_base_delta = torch.zeros(args_cli.num_envs, 3, device=args_cli.device)
@@ -201,9 +203,21 @@ def main():
                 env.close()
                 simulation_app.close()
 
-
     # close the simulator
     env.close()
+
+lastSuggestedAction = None
+
+def notChanged(suggested_action):
+    global lastSuggestedAction
+    if lastSuggestedAction is None:
+        lastSuggestedAction = suggested_action
+        return False
+    if np.allclose(lastSuggestedAction, suggested_action, atol=1e-4):
+        return True
+    else:
+        lastSuggestedAction = suggested_action
+        return False
 
 def safeObsImageToFile(obs):
     if obs is not None:

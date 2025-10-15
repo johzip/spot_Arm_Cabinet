@@ -67,18 +67,21 @@ class OperationSpaceController:
                 base_command,
                 arm_command = None):
 
-        #action = torch.zeros_like(current_joint_pos)
-        if arm_command is None:
+        joint_actions = []
+        joint_indices = []
+        success = [False] * self.num_robot
+        
+        if base_command is not None:
             current_base_joints_pos = current_joint_pos[:,self.base_idxs]
-
             current_base_joints_vel = current_joint_vel[:, self.base_idxs]
             base_joint_act = self.base_ctrl.compute_action(root_lin_vel_b, root_ang_vel_b,  gravity_b,
                                                              current_base_joints_pos, current_base_joints_vel,
                                                              base_command)
-            joint_action = base_joint_act
-            joint_index = self.base_idxs
+            joint_actions.append(base_joint_act)
+            joint_indices.append(self.base_idxs)
             success = [True] * self.num_robot
-        else:
+        
+        if arm_command is not None:
             current_arm_joints_pos = current_joint_pos[:, self.arm_idxs]
             ee_pose_w = body_state_w[:, self.ee_idx, 0:7].cpu().numpy()
             robot_base_pose = body_state_w[:, self.base_idx, 0:7].cpu().numpy()
@@ -89,18 +92,18 @@ class OperationSpaceController:
             arm_pose_command = arm_command[:,:3].cpu().numpy()
             arm_rot_command = arm_command[:,3:6].cpu().numpy()
         
-            # not add rot command
             arm_rot_command = [arm_rot_command[i]  if arm_rot_command[i].any() else None for i in range(self.num_robot)]
-            #print(f'ee position is {ee_pose_w[:,:3]},command is {arm_pose_command}')
-            arm_joint_act, success = self.arm_ctrl.compute_inverse_kinematics(
+            
+            arm_joint_act, arm_success = self.arm_ctrl.compute_inverse_kinematics(
                                                                         current_arm_joints_pos,
-                                                                        ee_pose_w[:,:3] + arm_pose_command, #,y,x
+                                                                        ee_pose_w[:,:3] + arm_pose_command,
                                                                         ee_pose_w[:,3:],
             )
-        
-            joint_action = torch.from_numpy(arm_joint_act).to(self.device, torch.float32)
-            joint_index = self.arm_idxs
+            
+            arm_joint_act = torch.from_numpy(arm_joint_act).to(self.device, torch.float32)
+            joint_actions.append(arm_joint_act)
+            joint_indices.append(self.arm_idxs)
+            success = arm_success
 
-
-        return joint_action,joint_index,success
+        return joint_actions, joint_indices, success
 

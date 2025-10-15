@@ -123,7 +123,7 @@ and the output torque (N*m). It is used to interpolate the output torque based o
 
 SPOT_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
-        usd_path=',/asset/spot_arm/spot_arm.usd',
+        usd_path=',/asset/spot/spot_wrist.usd',
 #f"{ISAAC_NUCLEUS_DIR}/Robots/BostonDynamics/spot/spot.usd",
         activate_contact_sensors=True,
         rigid_props=sim_utils.RigidBodyPropertiesCfg(

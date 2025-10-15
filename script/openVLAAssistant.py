@@ -5,6 +5,7 @@ import transformers.modeling_utils
 import torch
 import numpy as np
 from PIL import Image
+import gc
 
 # Disable flash attention warnings (from Spot_In_Scene.py)
 transformers.utils.import_utils._flash_attn_available = False
@@ -20,12 +21,21 @@ class OpenVLAAssistant:
         self.ready = False
         
         if self.enabled:
+            torch.cuda.empty_cache()
             self._load_model()
     
     def _load_model(self):
         """Load OpenVLA model (adapted from Spot_In_Scene.py)"""
         try:
             print("Loading OpenVLA model...")
+            if torch.cuda.is_available():
+                total_memory = torch.cuda.get_device_properties(0).total_memory
+                allocated_memory = torch.cuda.memory_allocated(0)
+                free_memory = total_memory - allocated_memory
+                print(f"📊 GPU Memory: {free_memory/1e9:.1f}GB free / {total_memory/1e9:.1f}GB total")
+                
+                if free_memory < 4e9:  # Less than 4GB free
+                    print("⚠️ Warning: Low GPU memory, OpenVLA may fail")
             
             self.processor = AutoProcessor.from_pretrained("openvla/openvla-7b", trust_remote_code=True)
             
@@ -35,17 +45,24 @@ class OpenVLAAssistant:
                 torch_dtype=torch.bfloat16, 
                 low_cpu_mem_usage=True, 
                 trust_remote_code=True,
-                device_map=None,
+                device_map="cuda:0",
             )
             
+            allocated_after = torch.cuda.memory_allocated(0)
+            print(f"📊 OpenVLA using {(allocated_after)/1e9:.1f}GB GPU memory")
+
             self.vla = self.vla.to("cuda:0")
             self.ready = True
             print("✅ OpenVLA loaded successfully")
+            
             
         except Exception as e:
             print(f"Failed to load OpenVLA: {e}")
             self.enabled = False
             self.ready = False
+
+            torch.cuda.empty_cache()
+            gc.collect()
     
     def get_action_suggestion(self, rgb_image, prompt):
         """Get action suggestion from OpenVLA"""
@@ -75,9 +92,18 @@ class OpenVLAAssistant:
             # Format prompt (adapted from Spot_In_Scene.py)
             formatted_prompt = f"In: {prompt}\nOut:"
             
+            
+            with torch.no_grad():
+                inputs = self.processor(formatted_prompt, pil_image).to("cuda:0", dtype=torch.bfloat16)
+                action = self.vla.predict_action(**inputs, unnorm_key="bridge_orig", do_sample=False)
+            
+            # Clean up inputs from GPU
+            del inputs
+            torch.cuda.empty_cache()
+            
             # Get prediction
-            inputs = self.processor(formatted_prompt, pil_image).to("cuda:0", dtype=torch.bfloat16)
-            action = self.vla.predict_action(**inputs, unnorm_key="bridge_orig", do_sample=False)
+            #inputs = self.processor(formatted_prompt, pil_image).to("cuda:0", dtype=torch.bfloat16)
+            #action = self.vla.predict_action(**inputs, unnorm_key="bridge_orig", do_sample=False)
             
             return action
             

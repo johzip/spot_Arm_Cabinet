@@ -318,8 +318,6 @@ class SpotCurtainEnv( DirectRLEnv):
 
         if(self.vla_mode):
             transformed_arm_cmd, transformed_gripper_cmd = self.apply_vla_command_with_transformation(actions)
-            print(f'Original arm cmd: {actions[:,3:9]}')
-            print(f'Transformed arm cmd: {transformed_arm_cmd}')
             # Use transformed commands instead of manual control
             arm_delta_pose = transformed_arm_cmd
             gripper_actions = transformed_gripper_cmd

@@ -347,7 +347,10 @@ class SpotCurtainEnv( DirectRLEnv):
                                                   self.actions[:,:3],
                                                   arm_comd) #arm 
         
-        self.robot_dof_targets[:, index] = action
+        #self.robot_dof_targets[:, index] = action
+        for joint_action, joint_indices in zip(action, index):
+            self.robot_dof_targets[:, joint_indices] = joint_action
+    
 
         if gripper_comd is not None and torch.any(gripper_comd != 0):            
             # Find joint indices for wrist and gripper

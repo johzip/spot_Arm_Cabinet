@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import torch
 import os
+import math
 
 
 import isaaclab.sim as sim_utils
@@ -40,7 +41,7 @@ class SpotCurtainEnvCfg(DirectRLEnvCfg):
     # robot need to change
     robot_cfg: ArticulationCfg = SPOT_CFG.replace(prim_path="/World/envs/env_.*/Robot")
     robot_cfg.spawn.usd_path = root + '/asset/spot/spot_wrist.usd'
-    robot_cfg.init_state.pos = (-0.05, 1.6, 0.4)
+    robot_cfg.init_state.pos = (-0.05, 1.55, 0.4)
     robot_cfg.spawn.activate_contact_sensors = False
 
     camera_cfg: CameraCfg = CameraCfg(
@@ -261,7 +262,7 @@ class SpotCurtainEnv( DirectRLEnv):
         R_wg = R_gw.transpose(-2, -1)  # World to gripper rotation (Rwg = Rgw^T)
         
         # Apply transformation: (Xg, Yg, Zg) = Rwg * (Xw - tgw)
-        target_pos_gripper = torch.bmm(R_wg, (target_pos_world - gripper_pos_w).unsqueeze(-1)).squeeze(-1)
+        #target_pos_gripper = torch.bmm(R_wg, (target_pos_world - gripper_pos_w).unsqueeze(-1)).squeeze(-1)
         
         # Step 4: Transform target rotation from camera frame to gripper frame
         # For rotation vectors, apply same rotational transformations
@@ -277,7 +278,7 @@ class SpotCurtainEnv( DirectRLEnv):
         position_scale = 1  # Scale VLA position commands (adjust based on your VLA model)
         rotation_scale = 1  # Scale VLA rotation commands (adjust based on your VLA model)
         
-        arm_position_delta = target_pos_gripper * position_scale
+        arm_position_delta = target_pos_world * position_scale
         arm_rotation_delta = target_rot_gripper * rotation_scale
         
         # Step 6: Create output commands
@@ -315,18 +316,15 @@ class SpotCurtainEnv( DirectRLEnv):
         self.arm_ee_pos_w = body_state_w[:, self.ee_idx, 0:3]
         self.arm_ee_quat_w = body_state_w[:, self.ee_idx, 3:7]
 
-        #if(self.vla_mode):
-        #    transformed_arm_cmd, transformed_gripper_cmd = self.apply_vla_command_with_transformation(actions)
-        #    print(f'Original arm cmd: {actions[:,3:9]}')
-        #    print(f'Transformed arm cmd: {transformed_arm_cmd}')
-        #    # Use transformed commands instead of manual control
-        #    arm_delta_pose = transformed_arm_cmd
-        #    gripper_actions = transformed_gripper_cmd
-        #
-        #    # Keep base at zero for VLA commands
-        #    ai_base_delta = torch.zeros(self.num_envs, 3, device=self.device)
-        #    
-        #    actions = torch.concat([ai_base_delta, arm_delta_pose, gripper_actions], dim=1)
+        if(self.vla_mode):
+            transformed_arm_cmd, transformed_gripper_cmd = self.apply_vla_command_with_transformation(actions)
+            print(f'Original arm cmd: {actions[:,3:9]}')
+            print(f'Transformed arm cmd: {transformed_arm_cmd}')
+            # Use transformed commands instead of manual control
+            arm_delta_pose = transformed_arm_cmd
+            gripper_actions = transformed_gripper_cmd
+            
+            actions = torch.cat([actions[:, :3], arm_delta_pose, gripper_actions], dim=1)
 
 
         self.actions = actions.clone().to(self.sim.device)

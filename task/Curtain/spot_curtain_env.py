@@ -121,13 +121,28 @@ class SpotCurtainEnv( DirectRLEnv):
 
         # Spawn cabinet directly 
         for env_idx in range(self.scene.cfg.num_envs):
-            cabinet_prim_path = f"/World/envs/env_{env_idx}/Cabinet"
-            cfg = sim_utils.UsdFileCfg(usd_path="/home/zipfelj/workspace/Articulate3D/full_scene_sim_ready/model_scene_video.usda")
+            #TODO: Place all objects for BridgeData Tests here
+            bridgeData_prim_path = f"/World/envs/env_{env_idx}/bridgeData"
+            root = os.getcwd()
+            #table
+            table_path=root+'/asset/objects/woodenTable.usd'
+            table_cfg = sim_utils.UsdFileCfg(usd_path=table_path)
+            table_cfg.scale = (0.0002, 0.0002, 0.0002)
             spawn_from_usd(
-                prim_path=cabinet_prim_path,
-                cfg=cfg,
-                translation=(1.2, 1.5, 0.39146906),
-                orientation=(0.69, 0, 0, 0.72),  # x, y, z, w
+                prim_path=bridgeData_prim_path+"/table",
+                cfg=table_cfg,
+                translation=(0.93, 1.37, -0.152),
+                orientation=(0.7, 0.7, 0, 0.0),  # x, y, z, w
+                
+            )
+            #brush
+            brush_path=root+'/asset/objects/paint_brush.usdz'
+            brush_cfg = sim_utils.UsdFileCfg(usd_path=brush_path)
+            spawn_from_usd(
+                prim_path=bridgeData_prim_path+"/brush",
+                cfg=brush_cfg,
+                translation=(0.7, 1.61, 0.33),
+                orientation=(0.0, 0, 0, 0.0),  # x, y, z, w
             )
 
         # clone, filter, and replicate

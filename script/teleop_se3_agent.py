@@ -30,7 +30,7 @@ parser.add_argument("--teleop_device", type=str, default="keyboard", help="Devic
 parser.add_argument("--task", type=str, default='MoDe-Spot-Curtain-v0', help="Name of the task.")
 parser.add_argument("--sensitivity", type=float, default=1.0, help="Sensitivity factor.")
 parser.add_argument("--enable_openvla", action="store_true", default=False, help="Enable OpenVLA assistance")
-parser.add_argument("--openvla_prompt", type=str, default="What action should the robot take to find and open the top drawer?", help="OpenVLA prompt")
+parser.add_argument("--openvla_prompt", type=str, default="Put Banana into pot", help="OpenVLA prompt")
 
 
 # append AppLauncher cli args

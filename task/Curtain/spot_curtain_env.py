@@ -41,7 +41,7 @@ class SpotCurtainEnvCfg(DirectRLEnvCfg):
     # robot need to change
     robot_cfg: ArticulationCfg = SPOT_CFG.replace(prim_path="/World/envs/env_.*/Robot")
     robot_cfg.spawn.usd_path = root + '/asset/spot/spot_wrist.usd'
-    robot_cfg.init_state.pos = (-0.05, 1.55, 0.4)
+    robot_cfg.init_state.pos = (-0.2, 1.55, 0.4)
     robot_cfg.spawn.activate_contact_sensors = False
 
     camera_cfg: CameraCfg = CameraCfg(
@@ -115,34 +115,58 @@ class SpotCurtainEnv( DirectRLEnv):
         from isaaclab.sim.spawners.from_files import spawn_from_usd
         
         self.robot = Articulation(self.cfg.robot_cfg)        
-        self._camera = Camera(self.cfg.wrist_camera_cfg)
+        self._camera = Camera(self.cfg.camera_cfg)
         
         spawn_ground_plane(prim_path="/World/ground", cfg=GroundPlaneCfg())
 
         # Spawn cabinet directly 
         for env_idx in range(self.scene.cfg.num_envs):
-            #TODO: Place all objects for BridgeData Tests here
+            #TODO: Place all objects for BridgeData Tests here also add physics to the object
             bridgeData_prim_path = f"/World/envs/env_{env_idx}/bridgeData"
             root = os.getcwd()
             #table
-            table_path=root+'/asset/objects/woodenTable.usd'
+            table_path=root+'/asset/objects/small_wooden_table.usd'
             table_cfg = sim_utils.UsdFileCfg(usd_path=table_path)
             table_cfg.scale = (0.0002, 0.0002, 0.0002)
             spawn_from_usd(
                 prim_path=bridgeData_prim_path+"/table",
                 cfg=table_cfg,
-                translation=(0.93, 1.37, -0.152),
-                orientation=(0.7, 0.7, 0, 0.0),  # x, y, z, w
+                translation=(0.93, 1.41, -0.152),
+                orientation=(0.7, 0.7, 0, 0),  # x, y, z, w
                 
             )
+
             #brush
-            brush_path=root+'/asset/objects/paint_brush.usdz'
-            brush_cfg = sim_utils.UsdFileCfg(usd_path=brush_path)
+            #brush_path=root+'/asset/objects/paint_brush.usd'
+            #brush_cfg = sim_utils.UsdFileCfg(usd_path=brush_path)
+            #brush_cfg.scale = (0.005, 0.005, 0.005)
+            #spawn_from_usd(
+            #    prim_path=bridgeData_prim_path+"/brush",
+            #    cfg=brush_cfg,
+            #    translation=(0.55, 1.17, 0.313),
+            #    orientation=(0, 0, 0, 0),  # x, y, z, w
+            #)
+
+            #banana
+            banana_path=root+'/asset/objects/banana.usd'
+            banana_cfg = sim_utils.UsdFileCfg(usd_path=banana_path)
+            banana_cfg.scale = (0.002, 0.002, 0.002)
             spawn_from_usd(
-                prim_path=bridgeData_prim_path+"/brush",
-                cfg=brush_cfg,
-                translation=(0.7, 1.61, 0.33),
-                orientation=(0.0, 0, 0, 0.0),  # x, y, z, w
+                prim_path=bridgeData_prim_path+"/banana",
+                cfg=banana_cfg,
+                translation=(0.67, 1.08, 0.313),
+                orientation=(0, 0, 0, 0),  # x, y, z, w
+            )
+
+            #pot
+            pot_path=root+'/asset/objects/Pot.usd'
+            pot_cfg = sim_utils.UsdFileCfg(usd_path=pot_path)
+            pot_cfg.scale = (0.07, 0.07, 0.07)
+            spawn_from_usd(
+                prim_path=bridgeData_prim_path+"/pot",
+                cfg=pot_cfg,
+                translation=(0.98, 1.5, 0.33),
+                orientation=(0.7, 0.7, 0, 0),  # x, y, z, w
             )
 
         # clone, filter, and replicate
@@ -426,7 +450,7 @@ class SpotCurtainEnv( DirectRLEnv):
     def _get_image_obs(self):
         camera_data = {}
         process = False
-        for data_type in self.cfg.wrist_camera_cfg.data_types:
+        for data_type in self.cfg.camera_cfg.data_types:
             if data_type == "rgb":
                 tem_data = self._camera.data.output[data_type].to(torch.uint8)  # / 255.0  # 【1，480，640，3】
                 if process:

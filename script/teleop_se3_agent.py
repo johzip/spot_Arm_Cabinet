@@ -136,10 +136,9 @@ def main():
                 env.unwrapped.enable_vla_mode()
                 image_np = obs[0].cpu().numpy() if obs.dim() == 4 else obs.cpu().numpy()
                 action = send_to_openvla(image_np, args_cli.openvla_prompt)
-                if action is not None:
-                    print("🤖 OpenVLA REST API returned:", action)
                 if suggested_action is not None:
-                    print(f"🤖 OpenVLA suggests: {suggested_action}")
+                    suggested_action = None #TODO as soon as VLA server is up and running, remove this line
+                    print("🤖 OpenVLA REST API returned:", action)
             else:
                 env.unwrapped.disable_vla_mode()
                 

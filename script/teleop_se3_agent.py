@@ -30,7 +30,7 @@ parser.add_argument("--teleop_device", type=str, default="keyboard", help="Devic
 parser.add_argument("--task", type=str, default='MoDe-Spot-Curtain-v0', help="Name of the task.")
 parser.add_argument("--sensitivity", type=float, default=1.0, help="Sensitivity factor.")
 parser.add_argument("--enable_openvla", action="store_true", default=False, help="Enable OpenVLA assistance")
-parser.add_argument("--openvla_prompt", type=str, default="What action should the robot take to find and open the top drawer?", help="OpenVLA prompt")
+parser.add_argument("--openvla_prompt", type=str, default="Put Banana into pot", help="OpenVLA prompt")
 
 
 # append AppLauncher cli args
@@ -110,7 +110,7 @@ def main():
             obs_dict = env.step(actions)[0] 
             obs = obs_dict["rgb"]
 
-            safeObsImageToFile(obs)
+            #safeObsImageToFile(obs)
 
             arm_delta_pose, gripper_command, base_delta_com, finish_flag = teleop_interface.advance()
 
@@ -155,7 +155,7 @@ def main():
 
                 # Combine AI actions
                 actions = torch.concat([base_delta_com, ai_arm_delta, ai_gripper_actions], dim=1)
-                print(f"🤖 Using AI control: base={base_delta_com[0].tolist()}, arm={ai_arm_delta[0].tolist()}, gripper={ai_gripper_actions[0].tolist()}")
+                #print(f"🤖 Using AI control: base={base_delta_com[0].tolist()}, arm={ai_arm_delta[0].tolist()}, gripper={ai_gripper_actions[0].tolist()}")
             else:
                 # Manual control
                 actions = torch.concat([base_delta_com, arm_delta_pose, gripper_actions], dim=1)

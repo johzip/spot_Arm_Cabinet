@@ -7,6 +7,10 @@ import numpy as np
 from PIL import Image
 import gc
 
+import time
+import cv2
+import os
+
 # Disable flash attention warnings (from Spot_In_Scene.py)
 transformers.utils.import_utils._flash_attn_available = False
 transformers.modeling_utils.is_flash_attn_available = lambda: False
@@ -70,26 +74,29 @@ class OpenVLAAssistant:
             return None
             
         try:
-            # Convert Isaac Lab image format to PIL (adapted format)
+            #Isaac Lab always gives uint8
             if isinstance(rgb_image, torch.Tensor):
-                # Isaac Lab typically returns [H, W, 3] tensors
-                if rgb_image.dim() == 4:  # [B, H, W, 3]
-                    rgb_image = rgb_image[0]  # Take first batch
-                
-                # Convert to numpy and ensure proper format
-                image_np = rgb_image.cpu().numpy()
-                
-                # Ensure values are in 0-255 range
-                if image_np.max() <= 1.0:
-                    image_np = (image_np * 255).astype(np.uint8)
+                # Handle Isaac Lab format: [num_envs, H, W, 3] or [H, W, 3]
+                if rgb_image.dim() == 4:
+                    image_np = rgb_image[0].cpu().numpy()  # Take first environment
                 else:
-                    image_np = image_np.astype(np.uint8)
-                
-                pil_image = Image.fromarray(image_np)
+                    image_np = rgb_image.cpu().numpy()
+            elif isinstance(rgb_image, np.ndarray):
+                image_np = rgb_image
             else:
-                pil_image = rgb_image
+                # Already PIL Image
+                pil_image = rgb_image.convert("RGB")
+                
+            # Direct conversion (no scaling needed for uint8)
+            if 'image_np' in locals():
+                pil_image = Image.fromarray(image_np)
             
-            # Format prompt (adapted from Spot_In_Scene.py)
+            # Always convert to RGB
+            pil_image = pil_image.convert("RGB")
+            #self.safePilImageToFile(pil_image, "openvla_input")
+
+                
+                # Format prompt
             formatted_prompt = f"In: {prompt}\nOut:"
             
             
@@ -110,3 +117,28 @@ class OpenVLAAssistant:
         except Exception as e:
             print(f"OpenVLA prediction error: {e}")
             return None
+        
+    def safePilImageToFile(self, pil_image, prefix="openvla_input"):
+        """Save PIL image to file for debugging OpenVLA input"""
+        if pil_image is not None:
+            timestamp = int(time.time() * 1000)
+            filename = f"out/{prefix}_{timestamp}"
+            os.makedirs("out", exist_ok=True)
+            
+            try:
+                # Method 1: Direct PIL save (simplest)
+                pil_image.save(f"{filename}.png")
+                print(f"✅ Saved PIL image: {filename}.png")
+                
+                # Optional Method 2: Using OpenCV (for consistency with your existing method)
+                # Convert PIL to numpy array
+                img_np = np.array(pil_image)
+                
+                # Convert RGB to BGR for OpenCV (PIL uses RGB, OpenCV uses BGR)
+                img_bgr = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
+                
+                cv2.imwrite(f"{filename}_cv2.png", img_bgr)
+                print(f"✅ Saved with OpenCV: {filename}_cv2.png")
+                
+            except Exception as error:
+                print(f"❌ Save PIL image failed: {error}")

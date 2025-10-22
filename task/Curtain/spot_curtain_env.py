@@ -65,14 +65,6 @@ class SpotCurtainEnvCfg(DirectRLEnvCfg):
     scene: InteractiveSceneCfg = InteractiveSceneCfg(num_envs=4, env_spacing=4.0, replicate_physics=False)
 
 
-# pre-physics step calls
-#   |-- _pre_physics_step(action)
-#   |-- _apply_action()
-# post-physics step calls
-#   |-- _get_dones()
-#   |-- _get_rewards()
-#   |-- _reset_idx(env_ids)
-#   |-- _get_observations()
 
 class SpotCurtainEnv( DirectRLEnv):
     cfg: SpotCurtainEnvCfg
@@ -136,7 +128,7 @@ class SpotCurtainEnv( DirectRLEnv):
                 
             )
 
-            #brush
+            #brush can be used instead ot banana or as clutter
             #brush_path=root+'/asset/objects/paint_brush.usd'
             #brush_cfg = sim_utils.UsdFileCfg(usd_path=brush_path)
             #brush_cfg.scale = (0.005, 0.005, 0.005)
@@ -452,7 +444,7 @@ class SpotCurtainEnv( DirectRLEnv):
         process = False
         for data_type in self.cfg.camera_cfg.data_types:
             if data_type == "rgb":
-                tem_data = self._camera.data.output[data_type].to(torch.uint8)  # / 255.0  # 【1，480，640，3】
+                tem_data = self._camera.data.output[data_type].to(torch.uint8)
                 if process:
                     encode_feature = self.encoder.extract_dino_features(tem_data)
                     camera_data['dino_feature'] = encode_feature

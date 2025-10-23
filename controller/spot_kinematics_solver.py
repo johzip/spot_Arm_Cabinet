@@ -102,6 +102,9 @@ class ArticulationKinematicsSolver:
         """
         # for multi robot, need to adapt to luna.pos3,therefore we adapt here, calculate one once a time
         results,succ_flg = [],[]
+        print("target_position:", target_position)
+        print("target_orientation:", target_orientation)
+        #TODO: Inverse Kinematics does not accept the values. so track the value changes and find mistakes!
         for i,kinematic_sover in enumerate(self._kinematics_solver):
             ik_result, succ = kinematic_sover.compute_inverse_kinematics(
                 self._ee_frame[i], target_position[i], target_orientation[i], warm_start[i], position_tolerance, orientation_tolerance
@@ -109,6 +112,7 @@ class ArticulationKinematicsSolver:
             if succ:
                 results.append(ik_result)
             else:
+                
                 print('IK fail')
                 results.append(warm_start[i])
             succ_flg.append(succ)

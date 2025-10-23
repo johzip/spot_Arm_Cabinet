@@ -141,8 +141,6 @@ def main():
                 env.unwrapped.enable_vla_mode()
                 image_np = obs[0].cpu().numpy() if obs.dim() == 4 else obs.cpu().numpy()
                 suggested_action = send_to_openvla(image_np, args_cli.openvla_prompt)
-                if suggested_action is not None:
-                    print("🤖 OpenVLA REST API returned:", suggested_action)
             else:
                 env.unwrapped.disable_vla_mode()
                 
@@ -151,11 +149,11 @@ def main():
             base_delta_com = torch.tensor(base_delta_com).to(torch.float).to(device=args_cli.device).reshape(args_cli.num_envs,-1)
             
             gripper_actions = torch.tensor(gripper_command).to(torch.float).to(device=args_cli.device).reshape(args_cli.num_envs, -1)
-        
+            
             
             if vlaMode and suggested_action is not None:
                 
-                suggested_action = np.array(suggested_action) * 2.5
+                #suggested_action = np.array(suggested_action) * 2.5
                 openvla_x, openvla_y, openvla_z = suggested_action[0], suggested_action[1], suggested_action[2]
                 openvla_roll, openvla_pitch, openvla_yaw = suggested_action[3], suggested_action[4], suggested_action[5]
                 openvla_gripper = suggested_action[6]
@@ -163,17 +161,18 @@ def main():
                 
                 # Arm: use OpenVLA's x, y, z for position + zero rotation (or manual rotation)
                 ai_arm_delta = torch.tensor([
-                    [openvla_x, openvla_y, openvla_z, 0.0, 0.0, 0.0]  # position from AI, rotation from manual
+                    [openvla_x, openvla_y, openvla_z, openvla_roll, openvla_pitch, openvla_yaw]  # position from AI, rotation from manual
                 ], device=args_cli.device).repeat(args_cli.num_envs, 1)
                 
                 # Gripper: use OpenVLA's roll, yaw, gripper (skip pitch)
                 ai_gripper_actions = torch.tensor([
-                    [openvla_gripper, openvla_roll, openvla_yaw]  # gripper, wrist_rot, wrist_pitch
+                    [openvla_gripper, openvla_roll, openvla_yaw] 
                 ], device=args_cli.device).repeat(args_cli.num_envs, 1)
 
                 # Combine AI actions
                 actions = torch.concat([base_delta_com, ai_arm_delta, ai_gripper_actions], dim=1)
-                #print(f"🤖 Using AI control: base={base_delta_com[0].tolist()}, arm={ai_arm_delta[0].tolist()}, gripper={ai_gripper_actions[0].tolist()}")
+                #print(f"suggested_action: {suggested_action}")
+                print(f"🤖 Using AI control: base={base_delta_com[0].tolist()}, arm={ai_arm_delta[0].tolist()}, gripper={ai_gripper_actions[0].tolist()}")
             else:
                 # Manual control
                 actions = torch.concat([base_delta_com, arm_delta_pose, gripper_actions], dim=1)

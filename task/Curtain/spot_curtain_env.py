@@ -107,7 +107,7 @@ class SpotCurtainEnv( DirectRLEnv):
         from isaaclab.sim.spawners.from_files import spawn_from_usd
         
         self.robot = Articulation(self.cfg.robot_cfg)        
-        self._camera = Camera(self.cfg.camera_cfg)
+        self._camera = Camera(self.cfg.wrist_camera_cfg)
         
         spawn_ground_plane(prim_path="/World/ground", cfg=GroundPlaneCfg())
 
@@ -350,10 +350,8 @@ class SpotCurtainEnv( DirectRLEnv):
         if(self.vla_mode):
             transformed_arm_cmd, transformed_gripper_cmd = self.apply_vla_command_with_transformation(actions)
             # Use transformed commands instead of manual control
-            arm_delta_pose = transformed_arm_cmd
-            gripper_actions = transformed_gripper_cmd
             
-            actions = torch.cat([actions[:, :3], arm_delta_pose, gripper_actions], dim=1)
+            actions = torch.cat([actions[:, :3], transformed_arm_cmd, transformed_gripper_cmd], dim=1)
 
 
         self.actions = actions.clone().to(self.sim.device)
@@ -442,7 +440,7 @@ class SpotCurtainEnv( DirectRLEnv):
     def _get_image_obs(self):
         camera_data = {}
         process = False
-        for data_type in self.cfg.camera_cfg.data_types:
+        for data_type in self.cfg.wrist_camera_cfg.data_types:
             if data_type == "rgb":
                 tem_data = self._camera.data.output[data_type].to(torch.uint8)
                 if process:

@@ -71,7 +71,12 @@ def send_to_openvla(image_np, prompt, server_url="http://localhost:8000/predict"
     data = {"prompt": prompt}
     response = requests.post(server_url, files=files, data=data)
     if response.ok:
-        return response.json()["action"]
+        result = response.json()
+        if "action" in result:
+            return result["action"]
+        else:
+            print("❌ 'action' key not found in response:", result)
+            return None
     else:
         print("❌ OpenVLA REST API error:", response.text)
         return None
@@ -135,10 +140,9 @@ def main():
 
                 env.unwrapped.enable_vla_mode()
                 image_np = obs[0].cpu().numpy() if obs.dim() == 4 else obs.cpu().numpy()
-                action = send_to_openvla(image_np, args_cli.openvla_prompt)
+                suggested_action = send_to_openvla(image_np, args_cli.openvla_prompt)
                 if suggested_action is not None:
-                    suggested_action = None #TODO as soon as VLA server is up and running, remove this line
-                    print("🤖 OpenVLA REST API returned:", action)
+                    print("🤖 OpenVLA REST API returned:", suggested_action)
             else:
                 env.unwrapped.disable_vla_mode()
                 

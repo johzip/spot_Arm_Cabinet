@@ -102,9 +102,6 @@ class ArticulationKinematicsSolver:
         """
         # for multi robot, need to adapt to luna.pos3,therefore we adapt here, calculate one once a time
         results,succ_flg = [],[]
-        print("target_position:", target_position)
-        print("target_orientation:", target_orientation)
-        #TODO: Inverse Kinematics does not accept the values. so track the value changes and find mistakes!
         for i,kinematic_sover in enumerate(self._kinematics_solver):
             ik_result, succ = kinematic_sover.compute_inverse_kinematics(
                 self._ee_frame[i], target_position[i], target_orientation[i], warm_start[i], position_tolerance, orientation_tolerance
@@ -112,10 +109,26 @@ class ArticulationKinematicsSolver:
             if succ:
                 results.append(ik_result)
             else:
-                
-                print('IK fail')
-                results.append(warm_start[i])
-            succ_flg.append(succ)
+                current_pos, _ = kinematic_sover.compute_forward_kinematics(self._ee_frame[i], warm_start[i], position_only=True)
+                # Ensure both current_pos and target_position[i] are flat arrays
+                current_pos = np.asarray(current_pos).flatten()
+                target_pos = np.asarray(target_position[i]).flatten()
+                print("-----------------")
+                print(f"Current position: {current_pos}, Target position: {target_pos}")
+                # Compute halfway point
+                halfway_pos = current_pos + 0.5 * (target_pos - current_pos)
+                print(f"Trying halfway position: {halfway_pos}")
+                # Try IK again with halfway position
+                ik_result_half, succ_half = kinematic_sover.compute_inverse_kinematics(
+                    self._ee_frame[i], halfway_pos, target_orientation[i], warm_start[i], position_tolerance, orientation_tolerance
+                )
+                if succ_half:
+                    results.append(ik_result_half)
+                    print("IK succeeded with halfway position.")
+                else:
+                    print("IK failed with halfway position, using warm start.")
+                    results.append(warm_start[i])
+                    succ_flg.append(succ)
 
         return np.array(results), succ_flg #self._joints_view.make_articulation_action(ik_result, None), succ
 

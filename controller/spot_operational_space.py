@@ -93,11 +93,11 @@ class OperationSpaceController:
             arm_rot_command = arm_command[:,3:6].cpu().numpy()
         
             arm_rot_command = [arm_rot_command[i]  if arm_rot_command[i].any() else None for i in range(self.num_robot)]
-            print(f"current_arm_ee_pose: {ee_pose_w[:,:3]}")
+            #print(f"current_arm_ee_pose: {ee_pose_w[:,:3]}")
             arm_joint_act, arm_success = self.arm_ctrl.compute_inverse_kinematics(
-                                                                        current_arm_joints_pos,
-                                                                        ee_pose_w[:,:3] + arm_pose_command,
-                                                                        ee_pose_w[:,3:],
+                current_arm_joints_pos,
+                arm_pose_command,
+                ee_pose_w[:,3:],
             )
             
             arm_joint_act = torch.from_numpy(arm_joint_act).to(self.device, torch.float32)

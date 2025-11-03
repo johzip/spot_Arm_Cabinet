@@ -171,8 +171,9 @@ def main():
 
                 # Combine AI actions
                 actions = torch.concat([base_delta_com, ai_arm_delta, ai_gripper_actions], dim=1)
+
                 #print(f"suggested_action: {suggested_action}")
-                print(f"🤖 Using AI control: base={base_delta_com[0].tolist()}, arm={ai_arm_delta[0].tolist()}, gripper={ai_gripper_actions[0].tolist()}")
+                #print(f"🤖 Using AI control: base={base_delta_com[0].tolist()}, arm={ai_arm_delta[0].tolist()}, gripper={ai_gripper_actions[0].tolist()}")
             else:
                 # Manual control
                 actions = torch.concat([base_delta_com, arm_delta_pose, gripper_actions], dim=1)

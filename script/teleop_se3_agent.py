@@ -10,7 +10,9 @@ import argparse
 import sys
 import os
 import numpy as np
-
+import requests
+from PIL import Image
+import io
 
 
 #from omni.isaac.lab.app import AppLauncher
@@ -53,16 +55,36 @@ import omni.log
 from task.Curtain import SpotCurtainEnv 
 from controller import se3_keyboard, spot_operational_space, spot_loco_solver, spot_kinematics_solver
 from controller.se3_keyboard import MMKeyboard
-from script.openVLAAssistant import OpenVLAAssistant
 from isaaclab_tasks.utils import parse_env_cfg
 import time
 import cv2
 
 
+
+def send_to_openvla(image_np, prompt, server_url="http://localhost:8000/predict"):
+    # Convert numpy image to PNG bytes
+    pil_image = Image.fromarray(image_np).convert("RGB")
+    img_bytes = io.BytesIO()
+    pil_image.save(img_bytes, format="PNG")
+    img_bytes.seek(0)
+    files = {"image": ("image.png", img_bytes, "image/png")}
+    data = {"prompt": prompt}
+    response = requests.post(server_url, files=files, data=data)
+    if response.ok:
+        result = response.json()
+        if "action" in result:
+            return result["action"]
+        else:
+            print("❌ 'action' key not found in response:", result)
+            return None
+    else:
+        print("❌ OpenVLA REST API error:", response.text)
+        return None
+
+
 def main():
     """Running keyboard teleoperation with Isaac Lab manipulation environment using OpenVLA to controll the robot."""
     if args_cli.enable_openvla:
-        openvla_assistant = OpenVLAAssistant(enabled=args_cli.enable_openvla)
         vlaMode = True
     else:
         vlaMode = False
@@ -114,15 +136,11 @@ def main():
 
             arm_delta_pose, gripper_command, base_delta_com, finish_flag = teleop_interface.advance()
 
-            if vlaMode and openvla_assistant.ready and obs is not None:
+            if vlaMode and obs is not None:
 
                 env.unwrapped.enable_vla_mode()
-                
-                #openvla_counter += 1
-                #if openvla_counter % 5 == 0:  # Every 100 steps, get OpenVLA suggestion
-                suggested_action = openvla_assistant.get_action_suggestion(obs, args_cli.openvla_prompt)
-                if suggested_action is not None:
-                    print(f"🤖 OpenVLA suggests: {suggested_action}")
+                image_np = obs[0].cpu().numpy() if obs.dim() == 4 else obs.cpu().numpy()
+                suggested_action = send_to_openvla(image_np, args_cli.openvla_prompt)
             else:
                 env.unwrapped.disable_vla_mode()
                 
@@ -131,13 +149,11 @@ def main():
             base_delta_com = torch.tensor(base_delta_com).to(torch.float).to(device=args_cli.device).reshape(args_cli.num_envs,-1)
             
             gripper_actions = torch.tensor(gripper_command).to(torch.float).to(device=args_cli.device).reshape(args_cli.num_envs, -1)
-        
+            
             
             if vlaMode and suggested_action is not None:
-                #TODO: if x,y,z is out of arm reach then perform base movement instead of arm movement (advanced)
-                #TODO: translate  roll, pitch, yaw, in wrist wr0 and wr1 movement OR implement self._delta_arm_rot = np.zeros(3)  # (roll, pitch, yaw) usage instead
-                #TODO: translate gripper value into gripper commands
-                suggested_action = np.array(suggested_action) * 2.5
+                
+                #suggested_action = np.array(suggested_action) * 2.5
                 openvla_x, openvla_y, openvla_z = suggested_action[0], suggested_action[1], suggested_action[2]
                 openvla_roll, openvla_pitch, openvla_yaw = suggested_action[3], suggested_action[4], suggested_action[5]
                 openvla_gripper = suggested_action[6]
@@ -145,16 +161,18 @@ def main():
                 
                 # Arm: use OpenVLA's x, y, z for position + zero rotation (or manual rotation)
                 ai_arm_delta = torch.tensor([
-                    [openvla_x, openvla_y, openvla_z, 0.0, 0.0, 0.0]  # position from AI, rotation from manual
+                    [openvla_x, openvla_y, openvla_z, openvla_roll, openvla_pitch, openvla_yaw]  # position from AI, rotation from manual
                 ], device=args_cli.device).repeat(args_cli.num_envs, 1)
                 
                 # Gripper: use OpenVLA's roll, yaw, gripper (skip pitch)
                 ai_gripper_actions = torch.tensor([
-                    [openvla_gripper, openvla_roll, openvla_yaw]  # gripper, wrist_rot, wrist_pitch
+                    [openvla_gripper, openvla_roll, openvla_yaw] 
                 ], device=args_cli.device).repeat(args_cli.num_envs, 1)
 
                 # Combine AI actions
                 actions = torch.concat([base_delta_com, ai_arm_delta, ai_gripper_actions], dim=1)
+
+                #print(f"suggested_action: {suggested_action}")
                 #print(f"🤖 Using AI control: base={base_delta_com[0].tolist()}, arm={ai_arm_delta[0].tolist()}, gripper={ai_gripper_actions[0].tolist()}")
             else:
                 # Manual control
@@ -168,18 +186,6 @@ def main():
     # close the simulator
     env.close()
 
-lastSuggestedAction = None
-
-def notChanged(suggested_action):
-    global lastSuggestedAction
-    if lastSuggestedAction is None:
-        lastSuggestedAction = suggested_action
-        return False
-    if np.allclose(lastSuggestedAction, suggested_action, atol=1e-4):
-        return True
-    else:
-        lastSuggestedAction = suggested_action
-        return False
 
 def safeObsImageToFile(obs):
     if obs is not None:

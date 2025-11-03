@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import torch
+torch.cuda.empty_cache()
+torch.cuda.ipc_collect()
 import os
 import math
 
@@ -247,6 +249,7 @@ class SpotCurtainEnv( DirectRLEnv):
         return R
     
     def apply_vla_command_with_transformation(self, actions):
+        
         """
         Transform VLA command from camera frame to gripper frame using homogeneous transformations
         
@@ -349,11 +352,8 @@ class SpotCurtainEnv( DirectRLEnv):
 
         if(self.vla_mode):
             transformed_arm_cmd, transformed_gripper_cmd = self.apply_vla_command_with_transformation(actions)
-            # Use transformed commands instead of manual control
-            arm_delta_pose = transformed_arm_cmd
-            gripper_actions = transformed_gripper_cmd
             
-            actions = torch.cat([actions[:, :3], arm_delta_pose, gripper_actions], dim=1)
+            actions = torch.cat([actions[:, :3], transformed_arm_cmd, transformed_gripper_cmd], dim=1)
 
 
         self.actions = actions.clone().to(self.sim.device)
@@ -388,7 +388,6 @@ class SpotCurtainEnv( DirectRLEnv):
             wr1_idx = joint_names.index('arm0_wr1') if 'arm0_wr1' in joint_names else None  
             f1x_idx = joint_names.index('arm0_f1x') if 'arm0_f1x' in joint_names else None
             
-            #TODO: remove sensitivety scaling HERE
             # Apply gripper commands directly
             if f1x_idx is not None:
                 gripper_step = gripper_comd[:, 0] * 5.0  # Increased to 5° per step
@@ -434,6 +433,30 @@ class SpotCurtainEnv( DirectRLEnv):
 
         limit = self.robot.data.joint_pos_limits[:, :, :]
         self.robot_dof_targets = torch.clamp(self.robot_dof_targets, limit[:, :, 0], limit[:, :, 1])
+
+    def _pre_physics_step_original(self, actions):
+
+        self.actions = actions.clone().to(self.sim.device)
+        lin_vel = self.robot.data.root_lin_vel_b
+        ang_vel = self.robot.data.root_ang_vel_b
+        gravity_b = self.robot.data.projected_gravity_b
+        current_joint_pos = self.robot.data.joint_pos
+        current_joint_vel = self.robot.data.joint_vel
+        body_state_w = self.robot.data.body_state_w
+        arm_comd =None
+        if self.actions[:,3:].any()!=0:
+            arm_comd = self.actions[:,3:]
+
+        # do not set the base_pose if arm related to body frame
+        action,index,_ = self.controller.compute(lin_vel, ang_vel,  gravity_b,
+                                                  current_joint_pos, current_joint_vel,
+                                                  body_state_w,  # ,y,x
+                                                  self.actions[:,:3],
+                                                  arm_comd) #, success
+        self.robot_dof_targets[:, index] = action
+        limit = self.robot.data.joint_limits[:, :, :]
+        self.robot_dof_targets = torch.clamp(self.robot_dof_targets, limit[:, :, 0], limit[:, :, 1])
+
 
     def _apply_action(self):
         self.robot.set_joint_position_target(self.robot_dof_targets) # 10 times

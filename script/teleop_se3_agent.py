@@ -132,7 +132,7 @@ def main():
             obs_dict = env.step(actions)[0] 
             obs = obs_dict["rgb"]
 
-            #safeObsImageToFile(obs)
+            safeObsImageToFile(obs)
 
             arm_delta_pose, gripper_command, base_delta_com, finish_flag = teleop_interface.advance()
 
@@ -166,14 +166,14 @@ def main():
                 
                 # Gripper: use OpenVLA's roll, yaw, gripper (skip pitch)
                 ai_gripper_actions = torch.tensor([
-                    [openvla_gripper, openvla_roll, openvla_yaw] 
+                    [openvla_gripper, 0.0, 0.0] 
                 ], device=args_cli.device).repeat(args_cli.num_envs, 1)
 
                 # Combine AI actions
                 actions = torch.concat([base_delta_com, ai_arm_delta, ai_gripper_actions], dim=1)
 
-                #print(f"suggested_action: {suggested_action}")
-                #print(f"🤖 Using AI control: base={base_delta_com[0].tolist()}, arm={ai_arm_delta[0].tolist()}, gripper={ai_gripper_actions[0].tolist()}")
+                print(f"suggested_action: {suggested_action}")
+                print(f"🤖 Using AI control: base={base_delta_com[0].tolist()}, arm={ai_arm_delta[0].tolist()}, gripper={ai_gripper_actions[0].tolist()}")
             else:
                 # Manual control
                 actions = torch.concat([base_delta_com, arm_delta_pose, gripper_actions], dim=1)

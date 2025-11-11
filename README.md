@@ -78,5 +78,3 @@ Isaac Lab installation is required to run the teleoperation script for the Spot 
 ### Other Interesting tutorials maybe help
 - [Articulation Controller](https://docs.isaacsim.omniverse.nvidia.com/latest/robot_simulation/articulation_controller.html)
 - [Kinematics Solver](https://docs.isaacsim.omniverse.nvidia.com/latest/manipulators/manipulators_lula_kinematics.html)
-
-

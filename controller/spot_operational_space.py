@@ -14,6 +14,9 @@ import numpy as np
 import isaaclab.utils.string as string_utils
 import torch
 from isaacsim.core.utils.extensions import enable_extension
+
+from transforms3d.euler import euler2quat, quat2euler
+
 enable_extension("omni.isaac.motion_generation")
 #from omni.isaac.motion_generation import LulaKinematicsSolver
 from controller.spot_kinematics_solver import ArticulationKinematicsSolver
@@ -91,13 +94,14 @@ class OperationSpaceController:
 
             arm_pose_command = arm_command[:,:3].cpu().numpy()
             arm_rot_command = arm_command[:,3:6].cpu().numpy()
+            #arm_rot_command_quat = euler2quat(arm_rot_command[0, 0], arm_rot_command[0, 1], arm_rot_command[0, 2]) #roll, pitch, yaw to quaternion
         
-            arm_rot_command = [arm_rot_command[i]  if arm_rot_command[i].any() else None for i in range(self.num_robot)]
+            #arm_rot_command = [arm_rot_command[i]  if arm_rot_command[i].any() else None for i in range(self.num_robot)]
             #print(f"current_arm_ee_pose: {ee_pose_w[:,:3]}")
             arm_joint_act, arm_success = self.arm_ctrl.compute_inverse_kinematics(
-                current_arm_joints_pos,
-                arm_pose_command,
-                ee_pose_w[:,3:],
+                warm_start = current_arm_joints_pos,
+                target_position = arm_pose_command,
+                target_orientation = arm_rot_command,
             )
             
             arm_joint_act = torch.from_numpy(arm_joint_act).to(self.device, torch.float32)

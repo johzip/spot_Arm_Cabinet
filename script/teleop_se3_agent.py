@@ -58,6 +58,7 @@ from controller.se3_keyboard import MMKeyboard
 from isaaclab_tasks.utils import parse_env_cfg
 import time
 import cv2
+import uuid
 
 
 
@@ -171,9 +172,10 @@ def main():
 
                 # Combine AI actions
                 actions = torch.concat([base_delta_com, ai_arm_delta, ai_gripper_actions], dim=1)
-
-                print(f"suggested_action: {suggested_action}")
-                print(f"🤖 Using AI control: base={base_delta_com[0].tolist()}, arm={ai_arm_delta[0].tolist()}, gripper={ai_gripper_actions[0].tolist()}")
+                print(f"vla command: arm={ai_arm_delta[0].tolist()}")
+            
+                #print(f"suggested_action: {suggested_action}")
+                #print(f"🤖 Using AI control: base={base_delta_com[0].tolist()}, arm={ai_arm_delta[0].tolist()}, gripper={ai_gripper_actions[0].tolist()}")
             else:
                 # Manual control
                 actions = torch.concat([base_delta_com, arm_delta_pose, gripper_actions], dim=1)
@@ -187,11 +189,15 @@ def main():
     env.close()
 
 
+# Generate a unique folder name for this execution
+EXECUTION_ID = str(uuid.uuid4())[:8]
+OUT_DIR = os.path.join("out", f"run_{EXECUTION_ID}")
+os.makedirs(OUT_DIR, exist_ok=True)
+
 def safeObsImageToFile(obs):
     if obs is not None:
         timestamp = int(time.time() * 1000)
-        filename = f"out/robot_camera_{timestamp}"
-        os.makedirs("out", exist_ok=True)
+        filename = os.path.join(OUT_DIR, f"robot_camera_{timestamp}")
         try:
             # Convert to numpy
             if obs.dim() == 4:
@@ -210,7 +216,6 @@ def safeObsImageToFile(obs):
             img_bgr = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
 
             cv2.imwrite(f"{filename}.png", img_bgr)
-            print(f"✅ Saved with OpenCV: {filename}.png")
                     
         except Exception as error:
             print(f"❌ save Image failed: {error}")

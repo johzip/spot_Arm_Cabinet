@@ -15,7 +15,6 @@ import isaaclab.utils.string as string_utils
 import torch
 from isaacsim.core.utils.extensions import enable_extension
 
-from transforms3d.euler import euler2quat, quat2euler
 
 enable_extension("omni.isaac.motion_generation")
 #from omni.isaac.motion_generation import LulaKinematicsSolver
@@ -68,7 +67,8 @@ class OperationSpaceController:
                 current_joint_vel,
                 body_state_w,
                 base_command,
-                arm_command = None):
+                arm_pos_command = None,
+                arm_ori_command = None):
 
         joint_actions = []
         joint_indices = []
@@ -84,24 +84,20 @@ class OperationSpaceController:
             joint_indices.append(self.base_idxs)
             success = [True] * self.num_robot
         
-        if arm_command is not None:
+        if arm_pos_command is not None or arm_ori_command is not None:
             current_arm_joints_pos = current_joint_pos[:, self.arm_idxs]
             ee_pose_w = body_state_w[:, self.ee_idx, 0:7].cpu().numpy()
             robot_base_pose = body_state_w[:, self.base_idx, 0:7].cpu().numpy()
 
             self.arm_ctrl.set_robot_base_pose(robot_base_pose[:,:3], robot_base_pose[:,3:])
             current_arm_joints_pos = current_arm_joints_pos.cpu().numpy()
-
-            arm_pose_command = arm_command[:,:3].cpu().numpy()
-            arm_rot_command = arm_command[:,3:6].cpu().numpy()
-            #arm_rot_command_quat = euler2quat(arm_rot_command[0, 0], arm_rot_command[0, 1], arm_rot_command[0, 2]) #roll, pitch, yaw to quaternion
         
             #arm_rot_command = [arm_rot_command[i]  if arm_rot_command[i].any() else None for i in range(self.num_robot)]
             #print(f"current_arm_ee_pose: {ee_pose_w[:,:3]}")
             arm_joint_act, arm_success = self.arm_ctrl.compute_inverse_kinematics(
                 warm_start = current_arm_joints_pos,
-                target_position = arm_pose_command,
-                target_orientation = arm_rot_command,
+                target_position = arm_pos_command.cpu().numpy(),
+                target_orientation = arm_ori_command.cpu().numpy(),
             )
             
             arm_joint_act = torch.from_numpy(arm_joint_act).to(self.device, torch.float32)

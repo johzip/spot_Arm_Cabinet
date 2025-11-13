@@ -21,6 +21,10 @@ from cfg.robotcfg import SPOT_CFG
 from controller.spot_operational_space import OperationSpaceController
 import torch.nn.functional as F
 
+from .utils import set_goal_position, set_goal_orientation, quat2mat, mat2euler, euler2mat, mat2quat
+import numpy as np
+import math
+
 
 @configclass
 class SpotCurtainEnvCfg(DirectRLEnvCfg):
@@ -97,7 +101,6 @@ class SpotCurtainEnv( DirectRLEnv):
         )
         self.robot_dof_pos = torch.zeros(
             (self.num_envs, self.robot.num_joints), device=self.sim.device)
-        self.actions = torch.zeros((self.num_envs, self.num_actions), device=self.sim.device)
 
         self.dt = self.cfg.sim.dt * self.cfg.decimation
         self.flag = torch.zeros((self.num_envs), device=self.sim.device)
@@ -239,182 +242,6 @@ class SpotCurtainEnv( DirectRLEnv):
     
     ################################################# translation functions 
 
-    def frameRotation_matrix(self, quat):
-        """
-        Convert quaternion (w, x, y, z) to 3x3 rotation matrix
-        
-        Args:
-            quat: torch.Tensor of shape [num_envs, 4] - quaternion in (w, x, y, z) format
-            
-        Returns:
-            R: torch.Tensor of shape [num_envs, 3, 3] - rotation matrix
-        """
-        # Normalize quaternion to ensure unit quaternion
-        quat = F.normalize(quat, dim=-1)
-        
-        # Extract quaternion components (w, x, y, z)
-        w, x, y, z = quat[..., 0], quat[..., 1], quat[..., 2], quat[..., 3]
-        
-        # Compute rotation matrix elements
-        # Using standard quaternion to rotation matrix formula
-        xx, yy, zz = x*x, y*y, z*z
-        xy, xz, yz = x*y, x*z, y*z
-        wx, wy, wz = w*x, w*y, w*z
-        
-        # Build rotation matrix [num_envs, 3, 3]
-        R = torch.stack([
-            torch.stack([1-2*(yy+zz), 2*(xy-wz), 2*(xz+wy)], dim=-1),
-            torch.stack([2*(xy+wz), 1-2*(xx+zz), 2*(yz-wx)], dim=-1),
-            torch.stack([2*(xz-wy), 2*(yz+wx), 1-2*(xx+yy)], dim=-1)
-        ], dim=-2)
-        
-        return R
-    
-    #def _apply_vla_command_with_transformation(self, actions):
-    #    
-    #    """
-    #    Transform VLA command from camera frame to gripper frame using homogeneous transformations
-    #    
-    #    Args:
-    #        actions: [num_envs, 12] - robot actions containing VLA command in format:
-    #        [base_x, base_y, base_yaw, arm_x, arm_y, arm_z, arm_rx, arm_ry, arm_rz, gripper_open, wrist_rot, wrist_pitch]
-    #    
-    #    Returns:
-    #        transformed_arm_command: [num_envs, 6] - [x, y, z, rx, ry, rz] in gripper frame
-    #        gripper_command: [num_envs, 3] - [gripper, wrist_rot, wrist_pitch]
-    #    """
-    #    
-    #    # Extract VLA command from actions (target position/rotation in camera frame)
-    #    base_pos = actions[:, 0:3]     # [base_x, base_y, base_yaw] - not used for VLA
-    #    arm_pos = actions[:, 3:6]      # [arm_x, arm_y, arm_z] - target position in camera frame (Xc, Yc, Zc)
-    #    arm_rot = actions[:, 6:9]      # [arm_rx, arm_ry, arm_rz] - target rotation in camera frame
-    #    gripper_cmd = actions[:, 9:12] # [gripper_open, wrist_rot, wrist_pitch]
-#
-    #    # VLA command represents target position in camera frame
-    #    target_pos_camera = arm_pos.float()  # [num_envs, 3] - (Xc, Yc, Zc)
-    #    target_rot_camera = arm_rot.float()  # [num_envs, 3] - rotation in camera frame
-    #    
-    #    # Get current poses (both are in world frame with (w, x, y, z) quaternion format)
-    #    camera_pos_w = self.camera_pos_w.float()    # [num_envs, 3] - tcw (camera position in world)
-    #    camera_quat_w = self.camera_quat_w.float()  # [num_envs, 4] - (w, x, y, z) camera orientation in world
-    #    gripper_pos_w = self.arm_ee_pos_w.float()   # [num_envs, 3] - tgw (gripper position in world)
-    #    gripper_quat_w = self.arm_ee_quat_w.float() # [num_envs, 4] - (w, x, y, z) gripper orientation in world
-    #    
-    #    # Step 1: Build transformation matrices
-    #    # Rcw - camera to world rotation matrix
-    #    R_cw = self.frameRotation_matrix(camera_quat_w)    # [num_envs, 3, 3]
-    #    
-    #    # Rgw - gripper to world rotation matrix  
-    #    R_gw = self.frameRotation_matrix(gripper_quat_w)   # [num_envs, 3, 3]
-    #    
-    #    # Step 2: Transform target position from camera frame to world frame
-    #    # Homogeneous transformation: (Xw, Yw, Zw, 1) = Hcw * (Xc, Yc, Zc, 1)
-    #    # Which simplifies to: (Xw, Yw, Zw) = Rcw * (Xc, Yc, Zc) + tcw
-    #    target_pos_world = torch.bmm(R_cw, target_pos_camera.unsqueeze(-1)).squeeze(-1) + camera_pos_w
-    #    
-    #    # Step 3: Transform target position from world frame to gripper frame
-    #    # Homogeneous transformation: (Xg, Yg, Zg, 1) = Hwg * (Xw, Yw, Zw, 1)
-    #    # Where Hwg = [Rwg, twg; 0, 1] and Rwg = Rgw^T (inverse rotation)
-    #    R_wg = R_gw.transpose(-2, -1)  # World to gripper rotation (Rwg = Rgw^T)
-    #    
-    #    # Step 4: Transform target rotation from camera frame to gripper frame
-    #    # For rotation vectors, apply same rotational transformations
-    #    # Camera frame to world frame
-    #    target_rot_world = torch.bmm(R_cw, target_rot_camera.unsqueeze(-1)).squeeze(-1)
-    #    
-    #    # World frame to gripper frame
-    #    target_rot_gripper = torch.bmm(R_wg, target_rot_world.unsqueeze(-1)).squeeze(-1)
-    #    
-    #    # Step 5: Convert target position in gripper frame to arm command (delta)
-    #    # The target position in gripper frame represents where we want to move relative to current gripper
-    #    # Apply scaling factors since VLA commands are often very small
-    #    position_scale = 1  # Scale VLA position commands (adjust based on your VLA model)
-    #    rotation_scale = 1  # Scale VLA rotation commands (adjust based on your VLA model)
-    #    
-    #    arm_position_delta = target_pos_world * position_scale
-    #    arm_rotation_delta = target_rot_gripper * rotation_scale
-    #    print("Transformed arm position before scaling:", arm_position_delta)
-    #    
-    #    # Step 6: Limit the delta between action and current arm position to not exceed 0.05
-    #    # Compute delta in world frame
-    #    current_arm_pos = gripper_pos_w  # [num_envs, 3]
-    #    delta_pos = arm_position_delta - current_arm_pos  # [num_envs, 3]
-    #    delta_norm = torch.norm(delta_pos, dim=1, keepdim=True)  # [num_envs, 1]
-    #    max_delta = 0.05
-    #    scale = torch.clamp(max_delta / (delta_norm + 1e-8), max=1.0)  # [num_envs, 1]
-    #    scaled_delta_pos = delta_pos * scale
-    #    scaled_arm_position = current_arm_pos + scaled_delta_pos
-#
-    #    # Use the scaled position as the new arm_position_delta
-    #    arm_position_delta = scaled_arm_position
-#
-    #    # Step 7: Create output commands
-    #    # Combine position and rotation deltas for arm command
-    #    transformed_arm_command = torch.cat([arm_position_delta, arm_rotation_delta], dim=1)  # [num_envs, 6]
-    #    
-    #    # Use original gripper commands (no transformation needed)
-    #    gripper_command = gripper_cmd  # [num_envs, 3] - [gripper_open, wrist_rot, wrist_pitch]
-    #    print("Transformed arm position after scaling:", arm_position_delta)
-    #    return transformed_arm_command, gripper_command
-
-    def apply_vla_command_with_transformation(self, actions):
-        """
-        Transform VLA command from camera frame to world frame using relative movements
-        
-        Args:
-            actions: [num_envs, 12] - robot actions containing VLA command in format:
-            [base_x, base_y, base_yaw, arm_x, arm_y, arm_z, arm_rx, arm_ry, arm_rz, gripper_open, wrist_rot, wrist_pitch]
-        
-        Returns:
-            transformed_arm_command: [num_envs, 6] - [x, y, z, rx, ry, rz] in world frame
-            gripper_command: [num_envs, 3] - [gripper, wrist_rot, wrist_pitch]
-        """
-        
-        # Extract VLA command from actions (relative movements in camera frame)
-        arm_pos = actions[:, 3:6]      # [arm_x, arm_y, arm_z] - relative movement in camera frame
-        arm_rot = actions[:, 6:9]      # [arm_rx, arm_ry, arm_rz] - relative rotation in camera frame
-        gripper_cmd = actions[:, 9:12] # [gripper_open, wrist_rot, wrist_pitch]
-
-        # Get current poses
-        camera_quat_w = self.camera_quat_w.float()  # [num_envs, 4] - (w, x, y, z) camera orientation in world
-        gripper_pos_w = self.arm_ee_pos_w.float()   # [num_envs, 3] - current gripper position in world
-        gripper_quat_w = self.arm_ee_quat_w.float() # [num_envs, 4] - (w, x, y, z) gripper orientation in world
-        
-        # Build transformation matrices
-        R_cw = self.frameRotation_matrix(camera_quat_w)  # Camera to world rotation matrix
-        R_gw = self.frameRotation_matrix(gripper_quat_w) # Gripper to world rotation matrix
-        R_wg = R_gw.transpose(-2, -1)  # World to gripper rotation matrix
-        
-        # Step 1: Transform relative movement from camera frame to world frame
-        # Only rotate the movement vector, don't add camera position
-        movement_world = torch.bmm(R_cw, arm_pos.unsqueeze(-1)).squeeze(-1)
-        
-        # Step 2: Apply movement relative to current gripper position
-        target_pos_world = gripper_pos_w + movement_world
-        
-        # Step 3: Transform rotation from camera frame to world frame, then to gripper frame
-        target_rot_world = torch.bmm(R_cw, arm_rot.unsqueeze(-1)).squeeze(-1)
-        target_rot_gripper = torch.bmm(R_wg, target_rot_world.unsqueeze(-1)).squeeze(-1)
-        
-        # Step 4: Apply scaling and limits
-        print("Target position before scaling:", target_pos_world)
-        
-        # Limit the movement to not exceed max_delta
-        delta_pos = target_pos_world - gripper_pos_w  # [num_envs, 3]
-        delta_norm = torch.norm(delta_pos, dim=1, keepdim=True)  # [num_envs, 1]
-        max_delta = 0.05
-        scale = torch.clamp(max_delta / (delta_norm + 1e-8), max=1.0)  # [num_envs, 1]
-        scaled_delta_pos = delta_pos * scale
-        scaled_target_pos = gripper_pos_w + scaled_delta_pos
-        
-        print("Target position after scaling:", scaled_target_pos)
-        
-        # Step 5: Create output commands
-        transformed_arm_command = torch.cat([scaled_target_pos, target_rot_gripper], dim=1)  # [num_envs, 6]
-        gripper_command = gripper_cmd  # [num_envs, 3]
-        
-        return transformed_arm_command, gripper_command
-
     def calculate_arm_goal(self, arm_actions):
         """
         Calculate arm goal positions and orientations using OSC-style goal setting
@@ -427,89 +254,53 @@ class SpotCurtainEnv( DirectRLEnv):
             goal_ori: [num_envs, 3, 3] target orientation matrices
         """
         
-        from utils import set_goal_position, set_goal_orientation, quat2mat
-        import numpy as np
-        
-        arm_pos = arm_actions[:, 3:6]  # [arm_x, arm_y, arm_z] - relative position delta
-        arm_rot = arm_actions[:, 6:9]  # [arm_rx, arm_ry, arm_rz] - relative rotation delta
+        pos_delta = arm_actions[:, 3:6]  # [arm_x, arm_y, arm_z] - relative position delta
+        rot_delta = arm_actions[:, 6:9]  # [arm_rx, arm_ry, arm_rz] - relative rotation delta
+        rot_delta = rot_delta[0].cpu().numpy() #only one env
 
         current_pos = self.arm_ee_pos_w  # [num_envs, 3]
-        current_quat = self.arm_ee_quat_w  # [num_envs, 4] - (w, x, y, z)
+        current_quat = self.arm_ee_quat_w[0].cpu().numpy()  # [num_envs, 4] - (w, x, y, z)
 
-        # Convert current quaternion to rotation matrix for OSC compatibility
-        # Isaac Lab quaternions are (w, x, y, z), need to convert to rotation matrices
-        current_rot_mats = []
-        for i in range(current_quat.shape[0]):
-            quat_numpy = current_quat[i].cpu().numpy()  # [w, x, y, z]
-            # Convert to rotation matrix using RoboSuite's transform utils
-            rot_mat = quat2mat(quat_numpy)  # Expects [w, x, y, z]
-            current_rot_mats.append(rot_mat)
+        current_rot_mat = quat2mat(current_quat)  # [num_envs, 3, 3]
         
-        # Process each environment separately (since OSC functions work with single robot)
-        goal_positions = []
-        goal_orientations = []
+        # Set goal position using OSC utility
+        goal_pos = set_goal_position(
+            delta=pos_delta,
+            current_position=current_pos,
+            position_limit=None #TODO set position limits
+        )
         
-        for env_idx in range(arm_actions.shape[0]):
-            # Extract delta commands for this environment
-            pos_delta = arm_pos[env_idx].cpu().numpy()  # [3]
-            rot_delta = arm_rot[env_idx].cpu().numpy()  # [3] - axis-angle representation
-            
-            # Current state for this environment
-            current_pos_np = current_pos[env_idx].cpu().numpy()  # [3]
-            current_rot_mat = current_rot_mats[env_idx]  # [3, 3]
-            
-            # Scale the delta commands (similar to OSC's scale_action)
-            # You can adjust these scaling factors based on your needs
-            pos_scale = 0.05  # 5cm max movement per step
-            rot_scale = 0.1   # 0.1 rad max rotation per step
-            
-            scaled_pos_delta = pos_delta * pos_scale
-            scaled_rot_delta = rot_delta * rot_scale
-            
-            # Set goal position using OSC utility
-            goal_pos = set_goal_position(
-                delta=scaled_pos_delta,
-                current_position=current_pos_np,
-                position_limit=None,  # You can add position limits if needed
-                set_pos=None
+        # Set goal orientation using OSC utility
+        # Check if rotation delta is non-zero (similar to OSC's approach)
+        bools = [0.0 if math.isclose(elem, 0.0) else 1.0 for elem in rot_delta]
+        
+        if sum(bools) > 0.0:
+            # There's a valid rotation command
+            goal_ori = set_goal_orientation(
+                delta=rot_delta,  # axis-angle representation
+                current_orientation=current_rot_mat,
+                orientation_limit=None #TODO set orientation limits
             )
-            
-            # Set goal orientation using OSC utility
-            # Check if rotation delta is non-zero (similar to OSC's approach)
-            bools = [0.0 if math.isclose(elem, 0.0) else 1.0 for elem in scaled_rot_delta]
-            
-            if sum(bools) > 0.0:
-                # There's a valid rotation command
-                goal_ori = set_goal_orientation(
-                    delta=scaled_rot_delta,  # axis-angle representation
-                    current_orientation=current_rot_mat,
-                    orientation_limit=None,  # You can add orientation limits if needed
-                    set_ori=None
-                )
-            else:
-                # No rotation command, keep current orientation
-                goal_ori = current_rot_mat.copy()
-            
-            goal_positions.append(goal_pos)
-            goal_orientations.append(goal_ori)
+        else:
+            # No rotation command, keep current orientation
+            goal_ori = current_rot_mat.copy()
+
+        goal_ori_euler = mat2quat(goal_ori)
         
         # Convert back to PyTorch tensors
-        goal_positions_tensor = torch.tensor(np.array(goal_positions), 
-                                        device=current_pos.device, 
-                                        dtype=current_pos.dtype)  # [num_envs, 3]
-        
-        goal_orientations_tensor = torch.tensor(np.array(goal_orientations), 
-                                            device=current_pos.device, 
-                                            dtype=current_pos.dtype)  # [num_envs, 3, 3]
-        
-        # Store goals for later use (similar to OSC)
-        self.goal_pos = goal_positions_tensor
-        self.goal_ori = goal_orientations_tensor
-        
-        print(f"New goal pos: {goal_positions_tensor}")
-        print(f"New goal ori shape: {goal_orientations_tensor.shape}")
-        
-        return goal_positions_tensor, goal_orientations_tensor
+        goal_pos_tensor = torch.tensor(
+            goal_pos, 
+            device=current_pos.device, 
+            dtype=torch.float32 
+        ).unsqueeze(0)  # [1, 3]
+    
+        goal_ori_tensor = torch.tensor(
+            goal_ori_euler, 
+            device=current_pos.device, 
+            dtype=torch.float32 
+        ).unsqueeze(0) # [1, 4]
+
+        return goal_pos_tensor, goal_ori_tensor
 
     ################################################# cyclic functions 
 
@@ -537,34 +328,43 @@ class SpotCurtainEnv( DirectRLEnv):
         self.arm_ee_pos_w = body_state_w[:, self.ee_idx, 0:3]
         self.arm_ee_quat_w = body_state_w[:, self.ee_idx, 3:7]
 
-        if(self.vla_mode):
-            #transformed_arm_cmd, transformed_gripper_cmd = self.apply_vla_command_with_transformation(actions)
-            # Only pass arm_x, arm_y, arm_z, arm_rx, arm_ry, arm_rz to calculate_arm_goal
-            transformed_arm_cmd = self.calculate_arm_goal(actions)
-            gripper_cmd = actions[:, 9:12]
-
-            actions = torch.cat([actions[:, :3], transformed_arm_cmd, gripper_cmd], dim=1)
-
-
-
-        self.actions = actions.clone().to(self.sim.device)
         lin_vel = self.robot.data.root_lin_vel_b
         ang_vel = self.robot.data.root_ang_vel_b
         gravity_b = self.robot.data.projected_gravity_b
         current_joint_pos = self.robot.data.joint_pos
         current_joint_vel = self.robot.data.joint_vel
         body_state_w = self.robot.data.body_state_w
-        arm_comd = None
         gripper_comd = None
-        if self.actions[:,3:].any()!=0:
-            arm_comd = self.actions[:,3:9]  # arm position (3) + arm rotation (3)
-            gripper_comd = self.actions[:,9:]  # gripper_open + wrist_rot + wrist_pitch
 
-        action,index,success = self.controller.compute(lin_vel, ang_vel,  gravity_b,
-                                                  current_joint_pos, current_joint_vel,
-                                                  body_state_w,
-                                                  self.actions[:,:3],
-                                                  arm_comd) #arm 
+        if(self.vla_mode):
+            #transformed_arm_cmd, transformed_gripper_cmd = self.apply_vla_command_with_transformation(actions)
+            # Only pass arm_x, arm_y, arm_z, arm_rx, arm_ry, arm_rz to calculate_arm_goal
+            transformed_pos_cmd, transformed_ori_cmd = self.calculate_arm_goal(actions)
+            print("transformed_pos_cmd: ", transformed_pos_cmd)
+            print("transformed_ori_cmd: ", transformed_ori_cmd)
+            gripper_cmd = actions[:, 9:12]
+
+            action,index,success = self.controller.compute(lin_vel, ang_vel,  gravity_b,
+                                                    current_joint_pos, current_joint_vel,
+                                                    body_state_w,
+                                                    actions[:,:3],
+                                                    transformed_pos_cmd,
+                                                    transformed_ori_cmd) #arm 
+
+        else:
+            arm_pos = None
+            arm_ori = None
+            if actions[:,3:].any()!=0:
+                arm_pos = actions[:,3:6]  # arm position (3) + arm rotation (3)
+                gripper_comd = actions[:,9:]  # gripper_open + wrist_rot + wrist_pitch
+                arm_ori = mat2quat(euler2mat(actions[:,6:9]))
+
+            action,index,success = self.controller.compute(lin_vel, ang_vel,  gravity_b,
+                                                    current_joint_pos, current_joint_vel,
+                                                    body_state_w,
+                                                    actions[:,:3], #base
+                                                    arm_pos, #pos
+                                                    arm_ori) 
         
         
         #TODO:

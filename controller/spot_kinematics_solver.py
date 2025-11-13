@@ -101,10 +101,14 @@ class ArticulationKinematicsSolver:
             success: Solver converged successfully
         """
         # for multi robot, need to adapt to luna.pos3,therefore we adapt here, calculate one once a time
+
+        if target_position.ndim == 3:
+            target_position = target_position.squeeze(axis=1)  # (1,1,3) -> (1,3)
+
         results,succ_flg = [],[]
         for i,kinematic_sover in enumerate(self._kinematics_solver):
             ik_result, succ = kinematic_sover.compute_inverse_kinematics(
-                self._ee_frame[i], target_position[i], target_orientation[i], warm_start[i], position_tolerance, orientation_tolerance
+                self._ee_frame[i], target_position[i].flatten(), target_orientation[i].flatten(), warm_start[i], position_tolerance, orientation_tolerance
             )
             if succ:
                 results.append(ik_result)

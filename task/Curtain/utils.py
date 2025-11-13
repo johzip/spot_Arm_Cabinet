@@ -2,7 +2,54 @@ import math
 import numpy as np
 import torch
 
-def set_goal_position(delta, current_position, position_limit=None, set_pos=None):
+PI = np.pi
+EPS = np.finfo(float).eps * 4.0
+
+# axis sequences for Euler angles
+_NEXT_AXIS = [1, 2, 0, 1]
+
+# map axes strings to/from tuples of inner axis, parity, repetition, frame
+_AXES2TUPLE = {
+    "sxyz": (0, 0, 0, 0),
+    "sxyx": (0, 0, 1, 0),
+    "sxzy": (0, 1, 0, 0),
+    "sxzx": (0, 1, 1, 0),
+    "syzx": (1, 0, 0, 0),
+    "syzy": (1, 0, 1, 0),
+    "syxz": (1, 1, 0, 0),
+    "syxy": (1, 1, 1, 0),
+    "szxy": (2, 0, 0, 0),
+    "szxz": (2, 0, 1, 0),
+    "szyx": (2, 1, 0, 0),
+    "szyz": (2, 1, 1, 0),
+    "rzyx": (0, 0, 0, 1),
+    "rxyx": (0, 0, 1, 1),
+    "ryzx": (0, 1, 0, 1),
+    "rxzx": (0, 1, 1, 1),
+    "rxzy": (1, 0, 0, 1),
+    "ryzy": (1, 0, 1, 1),
+    "rzxy": (1, 1, 0, 1),
+    "ryxy": (1, 1, 1, 1),
+    "ryxz": (2, 0, 0, 1),
+    "rzxz": (2, 0, 1, 1),
+    "rxyz": (2, 1, 0, 1),
+    "rzyz": (2, 1, 1, 1),
+}
+
+def vec(values):
+    """
+    Converts value tuple into a numpy vector.
+
+    Args:
+        values (n-array): a tuple of numbers
+
+    Returns:
+        np.array: vector of given values
+    """
+    return np.array(values, dtype=np.float32)
+
+
+def set_goal_position(delta, current_position, position_limit=None):
     """
     Calculates and returns the desired goal position, clipping the result accordingly to @position_limits.
     @delta and @current_position must be specified if a relative goal is requested, else @set_pos must be
@@ -21,10 +68,7 @@ def set_goal_position(delta, current_position, position_limit=None, set_pos=None
         ValueError: [Invalid position_limit shape]
     """
     n = len(current_position)
-    if set_pos is not None:
-        goal_position = set_pos
-    else:
-        goal_position = current_position + delta
+    goal_position = current_position + delta
 
     if position_limit is not None:
         if position_limit.shape != (2, n):
@@ -38,7 +82,7 @@ def set_goal_position(delta, current_position, position_limit=None, set_pos=None
     return goal_position
 
 
-def set_goal_orientation(delta, current_orientation, orientation_limit=None, set_ori=None):
+def set_goal_orientation(delta, current_orientation, orientation_limit=None):
     """
     Calculates and returns the desired goal orientation, clipping the result accordingly to @orientation_limits.
     @delta and @current_orientation must be specified if a relative goal is requested, else @set_ori must be
@@ -56,16 +100,12 @@ def set_goal_orientation(delta, current_orientation, orientation_limit=None, set
     Raises:
         ValueError: [Invalid orientation_limit shape]
     """
-    # directly set orientation
-    if set_ori is not None:
-        goal_orientation = set_ori
-
-    # otherwise use delta to set goal orientation
-    else:
-        # convert axis-angle value to rotation matrix
-        quat_error = axisangle2quat(delta)
-        rotation_mat_error = quat2mat(quat_error)
-        goal_orientation = np.dot(rotation_mat_error, current_orientation)
+  
+    # convert axis-angle value to rotation matrix
+    quat_error = axisangle2quat(delta)
+    rotation_mat_error = quat2mat(quat_error)
+    goal_orientation = np.dot(rotation_mat_error, current_orientation)
+    
 
     # check for orientation limits
     if np.array(orientation_limit).any():
@@ -124,7 +164,99 @@ def set_goal_orientation(delta, current_orientation, orientation_limit=None, set
                         euler[idx] = orientation_limit[1][idx]
         if limited:
             goal_orientation = euler2mat(np.array([euler[0], euler[1], euler[2]]))
+
     return goal_orientation
+
+def mat2euler(rmat, axes="sxyz"):
+    """
+    Converts given rotation matrix to euler angles in radian.
+
+    Args:
+        rmat (np.array): 3x3 rotation matrix
+        axes (str): One of 24 axis sequences as string or encoded tuple (see top of this module)
+
+    Returns:
+        np.array: (r,p,y) converted euler angles in radian vec3 float
+    """
+    try:
+        firstaxis, parity, repetition, frame = _AXES2TUPLE[axes.lower()]
+    except (AttributeError, KeyError):
+        firstaxis, parity, repetition, frame = axes
+
+    print(f"input mat in mat2euler: {rmat}")
+
+    i = firstaxis
+    j = _NEXT_AXIS[i + parity]
+    k = _NEXT_AXIS[i - parity + 1]
+
+    M = np.array(rmat, dtype=np.float32, copy=False)[:3, :3]
+    if repetition:
+        sy = math.sqrt(M[i, j] * M[i, j] + M[i, k] * M[i, k])
+        if sy > EPS:
+            ax = math.atan2(M[i, j], M[i, k])
+            ay = math.atan2(sy, M[i, i])
+            az = math.atan2(M[j, i], -M[k, i])
+        else:
+            ax = math.atan2(-M[j, k], M[j, j])
+            ay = math.atan2(sy, M[i, i])
+            az = 0.0
+    else:
+        cy = math.sqrt(M[i, i] * M[i, i] + M[j, i] * M[j, i])
+        if cy > EPS:
+            ax = math.atan2(M[k, j], M[k, k])
+            ay = math.atan2(-M[k, i], cy)
+            az = math.atan2(M[j, i], M[i, i])
+        else:
+            ax = math.atan2(-M[j, k], M[j, j])
+            ay = math.atan2(-M[k, i], cy)
+            az = 0.0
+
+    if parity:
+        ax, ay, az = -ax, -ay, -az
+    if frame:
+        ax, az = az, ax
+    return vec((ax, ay, az))
+
+
+def mat2quat(rmat):
+    """
+    Converts given rotation matrix to quaternion.
+
+    Args:
+        rmat (np.array): 3x3 rotation matrix
+
+    Returns:
+        np.array: (x,y,z,w) float quaternion angles
+    """
+    M = np.asarray(rmat).astype(np.float32)[:3, :3]
+
+    m00 = M[0, 0]
+    m01 = M[0, 1]
+    m02 = M[0, 2]
+    m10 = M[1, 0]
+    m11 = M[1, 1]
+    m12 = M[1, 2]
+    m20 = M[2, 0]
+    m21 = M[2, 1]
+    m22 = M[2, 2]
+    # symmetric matrix K
+    K = np.array(
+        [
+            [m00 - m11 - m22, np.float32(0.0), np.float32(0.0), np.float32(0.0)],
+            [m01 + m10, m11 - m00 - m22, np.float32(0.0), np.float32(0.0)],
+            [m02 + m20, m12 + m21, m22 - m00 - m11, np.float32(0.0)],
+            [m21 - m12, m02 - m20, m10 - m01, m00 + m11 + m22],
+        ]
+    )
+    K /= 3.0
+    # quaternion is Eigen vector of K that corresponds to largest eigenvalue
+    w, V = np.linalg.eigh(K)
+    inds = np.array([3, 0, 1, 2])
+    q1 = V[inds, np.argmax(w)]
+    if q1[0] < 0.0:
+        np.negative(q1, q1)
+    inds = np.array([1, 2, 3, 0])
+    return q1[inds]
 
 def quat2mat(quaternion):
     """
@@ -177,6 +309,8 @@ def axisangle2quat(vec):
     q[3] = np.cos(angle / 2.0)
     q[:3] = axis * np.sin(angle / 2.0)
     return q
+
+
 
 def mat2euler(rmat, axes="sxyz"):
     """

@@ -59,10 +59,11 @@ from isaaclab_tasks.utils import parse_env_cfg
 import time
 import cv2
 import uuid
+import json
 
 
 
-def send_to_openvla(image_np, prompt, server_url="http://localhost:8000/predict"):
+def send_to_openvla(image_np, prompt, robot_ee_pos=None, robot_ee_quat=None, robot_gripper_pos=None, server_url="http://localhost:8000/predict"):
     # Convert numpy image to PNG bytes
     pil_image = Image.fromarray(image_np).convert("RGB")
     img_bytes = io.BytesIO()
@@ -70,6 +71,19 @@ def send_to_openvla(image_np, prompt, server_url="http://localhost:8000/predict"
     img_bytes.seek(0)
     files = {"image": ("image.png", img_bytes, "image/png")}
     data = {"prompt": prompt}
+
+    if robot_ee_pos is not None:
+        pos_list = robot_ee_pos.tolist() if hasattr(robot_ee_pos, 'tolist') else robot_ee_pos
+        data["robot_ee_pos"] = json.dumps(pos_list)
+
+    if robot_ee_quat is not None:
+        quat_list = robot_ee_quat.tolist() if hasattr(robot_ee_quat, 'tolist') else robot_ee_quat
+        data["robot_ee_quat"] = json.dumps(quat_list)
+        
+    if robot_gripper_pos is not None:
+        gripper_list = robot_gripper_pos.tolist() if hasattr(robot_gripper_pos, 'tolist') else robot_gripper_pos
+        data["robot_gripper_pos"] = json.dumps(gripper_list)  
+
     response = requests.post(server_url, files=files, data=data)
     if response.ok:
         result = response.json()
@@ -143,10 +157,9 @@ def main():
                 image_np = obs[0].cpu().numpy() if obs.dim() == 4 else obs.cpu().numpy()
 
                 robot_ee_pos, robot_ee_quat, robot_gripper = env.unwrapped.get_robot_ee_state()
-                print(f"Robot EE Pos: {robot_ee_pos}, Quat: {robot_ee_quat}, Gripper: {robot_gripper}")
                 
-                #TODO: add robot_ee_pos, robot_ee_quat, robot_gripper_pos to API call
-                suggested_action = send_to_openvla(image_np, args_cli.openvla_prompt )
+                #TODO: check robot_ee_pos, robot_ee_quat, robot_gripper_pos to API call: ❌ OpenVLA REST API error: Internal Server Error
+                suggested_action = send_to_openvla(image_np, args_cli.openvla_prompt ,robot_ee_pos, robot_ee_quat, robot_gripper )
             else:
                 env.unwrapped.disable_vla_mode()
                 
@@ -177,7 +190,6 @@ def main():
 
                 # Combine AI actions
                 actions = torch.concat([base_delta_com, ai_arm_delta, ai_gripper_actions], dim=1)
-                print(f"vla command: arm={ai_arm_delta[0].tolist()}")
             
                 #print(f"suggested_action: {suggested_action}")
                 #print(f"🤖 Using AI control: base={base_delta_com[0].tolist()}, arm={ai_arm_delta[0].tolist()}, gripper={ai_gripper_actions[0].tolist()}")

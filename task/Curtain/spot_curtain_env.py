@@ -178,7 +178,7 @@ class SpotCurtainEnv( DirectRLEnv):
             spawn_from_usd(
                 prim_path=bridgeData_prim_path+"/scissor",
                 cfg=scissor_cfg,
-                translation=(0.80, 1.47, 0.313),
+                translation=(0.80, 1.17, 0.313),
                 orientation=(0, 0, 0, 0),  # x, y, z, w
             )
 
@@ -189,7 +189,7 @@ class SpotCurtainEnv( DirectRLEnv):
             spawn_from_usd(
                 prim_path=bridgeData_prim_path+"/soda_can",
                 cfg=can_cfg,
-                translation=(0.35, 1.47, 0.313),
+                translation=(0.85, 1.77, 0.313),
                 orientation=(0, 0, 0, 0),  # x, y, z, w
             )
 
@@ -377,11 +377,10 @@ class SpotCurtainEnv( DirectRLEnv):
         gripper_comd = None
 
         if(self.vla_mode):
-            #transformed_arm_cmd, transformed_gripper_cmd = self.apply_vla_command_with_transformation(actions)
-            # Only pass arm_x, arm_y, arm_z, arm_rx, arm_ry, arm_rz to calculate_arm_goal
+            actions = actions.clone()
+            actions[:, 3:6] = actions[:, 3:6] * 0.2 
+            #TODO:scale the action commands properly with maximum output and min input thresholds
             transformed_pos_cmd, transformed_ori_cmd = self.calculate_arm_goal(actions)
-            print("transformed_pos_cmd: ", transformed_pos_cmd)
-            print("transformed_ori_cmd: ", transformed_ori_cmd)
             gripper_cmd = actions[:, 9:12]
 
             action,index,success = self.controller.compute(lin_vel, ang_vel,  gravity_b,

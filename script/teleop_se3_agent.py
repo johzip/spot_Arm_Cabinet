@@ -141,7 +141,12 @@ def main():
 
                 env.unwrapped.enable_vla_mode()
                 image_np = obs[0].cpu().numpy() if obs.dim() == 4 else obs.cpu().numpy()
-                suggested_action = send_to_openvla(image_np, args_cli.openvla_prompt)
+
+                robot_ee_pos, robot_ee_quat, robot_gripper = env.unwrapped.get_robot_ee_state()
+                print(f"Robot EE Pos: {robot_ee_pos}, Quat: {robot_ee_quat}, Gripper: {robot_gripper}")
+                
+                #TODO: add robot_ee_pos, robot_ee_quat, robot_gripper_pos to API call
+                suggested_action = send_to_openvla(image_np, args_cli.openvla_prompt )
             else:
                 env.unwrapped.disable_vla_mode()
                 
@@ -194,6 +199,7 @@ EXECUTION_ID = str(uuid.uuid4())[:8]
 OUT_DIR = os.path.join("out", f"run_{EXECUTION_ID}")
 os.makedirs(OUT_DIR, exist_ok=True)
 
+#TODO rewrite this to create a video from images
 def safeObsImageToFile(obs):
     if obs is not None:
         timestamp = int(time.time() * 1000)

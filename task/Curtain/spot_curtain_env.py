@@ -118,6 +118,21 @@ class SpotCurtainEnv( DirectRLEnv):
         """Disable VLA command transformation"""
         self.vla_mode = False
 
+    def get_robot_ee_state(self):
+        """Get the end-effector state: position, orientation, gripper state"""
+        robot_ee_pos = self.arm_ee_pos_w[0].cpu().numpy()
+        robot_ee_quat = self.arm_ee_quat_w[0].cpu().numpy()
+        
+        # Assuming gripper state is represented by the last joint position
+        gripper_joint_name = 'arm0_f1x'  # Example gripper joint name
+        if gripper_joint_name in self.robot.joint_names:
+            gripper_idx = self.robot.joint_names.index(gripper_joint_name)
+            robot_gripper = self.robot_dof_pos[0, gripper_idx].cpu().numpy()
+        else:
+            robot_gripper = None  # Gripper joint not found
+        
+        return robot_ee_pos, robot_ee_quat, robot_gripper
+    
     def _setup_scene(self,) :
         from isaaclab.sim.spawners.from_files import spawn_from_usd
         
@@ -142,16 +157,7 @@ class SpotCurtainEnv( DirectRLEnv):
                 
             )
 
-            #brush can be used instead ot banana or as clutter
-            #brush_path=root+'/asset/objects/paint_brush.usd'
-            #brush_cfg = sim_utils.UsdFileCfg(usd_path=brush_path)
-            #brush_cfg.scale = (0.005, 0.005, 0.005)
-            #spawn_from_usd(
-            #    prim_path=bridgeData_prim_path+"/brush",
-            #    cfg=brush_cfg,
-            #    translation=(0.55, 1.17, 0.313),
-            #    orientation=(0, 0, 0, 0),  # x, y, z, w
-            #)
+            #TODO: spawn the banana at a random position on the table
 
             #banana
             banana_path=root+'/asset/objects/banana.usd'
@@ -161,6 +167,40 @@ class SpotCurtainEnv( DirectRLEnv):
                 prim_path=bridgeData_prim_path+"/banana",
                 cfg=banana_cfg,
                 translation=(0.67, 1.08, 0.313),
+                orientation=(0, 0, 0, 0),  # x, y, z, w
+            )
+
+            #TODO: add randomizer, that spawns the following objects only by chance and at random locations on the table. They can not tough each other
+            #scissor
+            scissor_path=root+'/asset/objects/scissors.usd'
+            scissor_cfg = sim_utils.UsdFileCfg(usd_path=scissor_path)
+            scissor_cfg.scale = (0.005, 0.005, 0.005)
+            spawn_from_usd(
+                prim_path=bridgeData_prim_path+"/scissor",
+                cfg=scissor_cfg,
+                translation=(0.80, 1.47, 0.313),
+                orientation=(0, 0, 0, 0),  # x, y, z, w
+            )
+
+            #can
+            can_path=root+'/asset/objects/soda_can.usd'
+            can_cfg = sim_utils.UsdFileCfg(usd_path=can_path)
+            can_cfg.scale = (0.0005, 0.0005, 0.0005)
+            spawn_from_usd(
+                prim_path=bridgeData_prim_path+"/soda_can",
+                cfg=can_cfg,
+                translation=(0.35, 1.47, 0.313),
+                orientation=(0, 0, 0, 0),  # x, y, z, w
+            )
+
+            #brush can be used instead ot banana or as clutter
+            brush_path=root+'/asset/objects/paint_brush.usd'
+            brush_cfg = sim_utils.UsdFileCfg(usd_path=brush_path)
+            brush_cfg.scale = (0.005, 0.005, 0.005)
+            spawn_from_usd(
+                prim_path=bridgeData_prim_path+"/brush",
+                cfg=brush_cfg,
+                translation=(0.55, 1.17, 0.313),
                 orientation=(0, 0, 0, 0),  # x, y, z, w
             )
 

@@ -5,6 +5,7 @@ torch.cuda.empty_cache()
 torch.cuda.ipc_collect()
 import os
 import math
+import random
 
 
 import isaaclab.sim as sim_utils
@@ -21,7 +22,7 @@ from cfg.robotcfg import SPOT_CFG
 from controller.spot_operational_space import OperationSpaceController
 import torch.nn.functional as F
 
-from .utils import set_goal_position, set_goal_orientation, quat2mat, mat2euler, euler2mat, mat2quat
+from .utils import set_goal_position, set_goal_orientation, quat2mat, mat2euler, euler2mat, mat2quat, axisangle2quat
 import numpy as np
 import math
 
@@ -157,6 +158,11 @@ class SpotCurtainEnv( DirectRLEnv):
                 
             )
 
+            
+
+            positions_list = self.generate_points()
+            random.shuffle(positions_list)
+
             #TODO: spawn the banana at a random position on the table
 
             #banana
@@ -166,54 +172,61 @@ class SpotCurtainEnv( DirectRLEnv):
             spawn_from_usd(
                 prim_path=bridgeData_prim_path+"/banana",
                 cfg=banana_cfg,
-                translation=(0.67, 1.08, 0.313),
+                translation=positions_list.pop(0),
                 orientation=(0, 0, 0, 0),  # x, y, z, w
             )
 
-            #TODO: add randomizer, that spawns the following objects only by chance and at random locations on the table. They can not tough each other
-            #scissor
-            scissor_path=root+'/asset/objects/scissors.usd'
-            scissor_cfg = sim_utils.UsdFileCfg(usd_path=scissor_path)
-            scissor_cfg.scale = (0.005, 0.005, 0.005)
-            spawn_from_usd(
-                prim_path=bridgeData_prim_path+"/scissor",
-                cfg=scissor_cfg,
-                translation=(0.80, 1.17, 0.313),
-                orientation=(0, 0, 0, 0),  # x, y, z, w
-            )
+            if(random.random()>0.3):
+                #scissor
 
-            #can
-            can_path=root+'/asset/objects/soda_can.usd'
-            can_cfg = sim_utils.UsdFileCfg(usd_path=can_path)
-            can_cfg.scale = (0.0005, 0.0005, 0.0005)
-            spawn_from_usd(
-                prim_path=bridgeData_prim_path+"/soda_can",
-                cfg=can_cfg,
-                translation=(0.85, 1.77, 0.313),
-                orientation=(0, 0, 0, 0),  # x, y, z, w
-            )
+                scissor_path=root+'/asset/objects/scissors.usd'
+                scissor_cfg = sim_utils.UsdFileCfg(usd_path=scissor_path)
+                scissor_cfg.scale = (0.005, 0.005, 0.005)
+                spawn_from_usd(
+                    prim_path=bridgeData_prim_path+"/scissor",
+                    cfg=scissor_cfg,
+                    translation=positions_list.pop(0),
+                    orientation=(0, 0, 0, 0),  # x, y, z, w
+                )
 
-            #brush can be used instead ot banana or as clutter
-            brush_path=root+'/asset/objects/paint_brush.usd'
-            brush_cfg = sim_utils.UsdFileCfg(usd_path=brush_path)
-            brush_cfg.scale = (0.005, 0.005, 0.005)
-            spawn_from_usd(
-                prim_path=bridgeData_prim_path+"/brush",
-                cfg=brush_cfg,
-                translation=(0.55, 1.17, 0.313),
-                orientation=(0, 0, 0, 0),  # x, y, z, w
-            )
+            if(random.random()>0.8):
+                pos = positions_list.pop(0)
+                #can
+                can_path=root+'/asset/objects/soda_can.usd'
+                can_cfg = sim_utils.UsdFileCfg(usd_path=can_path)
+                can_cfg.scale = (0.0005, 0.0005, 0.0005)
+                spawn_from_usd(
+                    prim_path=bridgeData_prim_path+"/soda_can",
+                    cfg=can_cfg,
+                    translation=(pos[0], pos[1], 0.323),
+                    orientation=(0, 0, 0, 0),  # x, y, z, w
+                )
 
-            #pot
-            pot_path=root+'/asset/objects/Pot.usd'
-            pot_cfg = sim_utils.UsdFileCfg(usd_path=pot_path)
-            pot_cfg.scale = (0.07, 0.07, 0.07)
-            spawn_from_usd(
-                prim_path=bridgeData_prim_path+"/pot",
-                cfg=pot_cfg,
-                translation=(0.98, 1.5, 0.33),
-                orientation=(0.7, 0.7, 0, 0),  # x, y, z, w
-            )
+            if(random.random()>0.4):
+                #brush can be used instead ot banana or as clutter
+                brush_path=root+'/asset/objects/paint_brush.usd'
+                brush_cfg = sim_utils.UsdFileCfg(usd_path=brush_path)
+                brush_cfg.scale = (0.005, 0.005, 0.005)
+                spawn_from_usd(
+                    prim_path=bridgeData_prim_path+"/brush",
+                    cfg=brush_cfg,
+                    translation=positions_list.pop(0),
+                    orientation=(0, 0, 0, 0),  # x, y, z, w
+                )
+            
+            if(random.random()>0.2):
+                pos = positions_list.pop(0)
+                #pot
+                pot_path=root+'/asset/objects/Pot.usd'
+                pot_cfg = sim_utils.UsdFileCfg(usd_path=pot_path)
+                pot_cfg.scale = (0.07, 0.07, 0.07)
+                spawn_from_usd(
+                    prim_path=bridgeData_prim_path+"/pot",
+                    cfg=pot_cfg,
+                    translation=(pos[0]+0.3, pos[1], 0.33),
+                    orientation=(0.7, 0.7, 0, 0),  # x, y, z, w
+                )
+            
 
             #bird_camera
             bird_camera_path=root+'/asset/objects/bird_camera.usd'
@@ -221,7 +234,7 @@ class SpotCurtainEnv( DirectRLEnv):
             spawn_from_usd(
                 prim_path=bridgeData_prim_path+"/bird_camera",
                 cfg=bird_camera_cfg,
-                translation=(1.7, 1.3, 1.9),
+                translation=(1.5, 1.3, 1.6),
                 orientation=(0.66, 0.24, 0.24, 0.66),  # x, y, z, w
             )
 
@@ -251,6 +264,25 @@ class SpotCurtainEnv( DirectRLEnv):
         # Add lights
         light_cfg = sim_utils.DomeLightCfg(intensity=2000.0)
         light_cfg.func("/World/Light", light_cfg)
+
+    # Generate a list of 8 (x, y, z) points within the specified limits,
+    # ensuring that no two points are closer than 0.15 units apart.
+    def generate_points(self, num_points=8, x_range=(0.5, 1.2), y_range=(1.0, 1.8), z_value=0.313, min_dist=0.15):
+        points = []
+        attempts = 0
+        max_attempts = 1000
+        while len(points) < num_points and attempts < max_attempts:
+            x = random.uniform(*x_range)
+            y = random.uniform(*y_range)
+            z = z_value
+            candidate = (x, y, z)
+            # Check distance to all existing points
+            if all(math.hypot(x - px, y - py) >= min_dist for px, py, _ in points):
+                points.append(candidate)
+            attempts += 1
+        if len(points) < num_points:
+            raise RuntimeError("Could not generate enough non-overlapping points.")
+        return points
 
     def _reset_idx(self, env_ids):
         if env_ids is None:
@@ -383,6 +415,11 @@ class SpotCurtainEnv( DirectRLEnv):
             transformed_pos_cmd, transformed_ori_cmd = self.calculate_arm_goal(actions)
             gripper_cmd = actions[:, 9:12]
 
+            print(transformed_ori_cmd)#tensor([[ 0.9919, -0.0675, -0.0304,  0.1030]], device='cuda:0')
+            print("type:", type(transformed_ori_cmd))#type: <class 'torch.Tensor'>
+            
+            
+
             action,index,success = self.controller.compute(lin_vel, ang_vel,  gravity_b,
                                                     current_joint_pos, current_joint_vel,
                                                     body_state_w,
@@ -396,14 +433,24 @@ class SpotCurtainEnv( DirectRLEnv):
             if actions[:,3:].any()!=0:
                 arm_pos = actions[:,3:6]  # arm position (3) + arm rotation (3)
                 gripper_comd = actions[:,9:]  # gripper_open + wrist_rot + wrist_pitch
-                arm_ori = mat2quat(euler2mat(actions[:,6:9]))
+                axis_angle = actions[0:,6:9].cpu().numpy()
+                quat_numpy = axisangle2quat(axis_angle)  # Convert Euler to Quaternion
+                
+                
+                arm_ori = torch.tensor(
+                    [quat_numpy],  # Wrap in list to create [1, 4] batch dimension
+                    device=actions.device, 
+                    dtype=torch.float32
+                )
+                print(arm_ori)#[0. 0. 0. 1.]
+                print("type:", type(arm_ori))#type: <class 'numpy.ndarray'>
 
             action,index,success = self.controller.compute(lin_vel, ang_vel,  gravity_b,
                                                     current_joint_pos, current_joint_vel,
                                                     body_state_w,
                                                     actions[:,:3], #base
-                                                    arm_pos, #pos
-                                                    arm_ori) 
+                                                    arm_pos,
+                                                    arm_ori)
         
         
         #TODO:

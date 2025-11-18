@@ -165,6 +165,7 @@ def main():
             else:
                 env.unwrapped.disable_vla_mode()
                 
+            #TODO: follow keyboard command to see where it gets nullified. 
 
             arm_delta_pose = torch.tensor(arm_delta_pose).to(torch.float).to(device=args_cli.device).reshape(args_cli.num_envs,-1)
             base_delta_com = torch.tensor(base_delta_com).to(torch.float).to(device=args_cli.device).reshape(args_cli.num_envs,-1)
@@ -215,7 +216,7 @@ os.makedirs(OUT_DIR, exist_ok=True)
 
 # Initialize video writer globally
 VIDEO_PATH = os.path.join(OUT_DIR, "vla_camera_video.mp4")
-video_writer = imageio.get_writer(VIDEO_PATH, fps=30)
+video_writer = imageio.get_writer(VIDEO_PATH, fps=10)
 
 def safeObsImageToFile(obs):
     if obs is not None:

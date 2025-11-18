@@ -60,6 +60,8 @@ import time
 import cv2
 import uuid
 import json
+import imageio
+import atexit
 
 
 
@@ -211,32 +213,41 @@ EXECUTION_ID = str(uuid.uuid4())[:8]
 OUT_DIR = os.path.join("out", f"run_{EXECUTION_ID}")
 os.makedirs(OUT_DIR, exist_ok=True)
 
-#TODO rewrite this to create a video from images
+# Initialize video writer globally
+VIDEO_PATH = os.path.join(OUT_DIR, "vla_camera_video.mp4")
+video_writer = imageio.get_writer(VIDEO_PATH, fps=30)
+
 def safeObsImageToFile(obs):
     if obs is not None:
-        timestamp = int(time.time() * 1000)
-        filename = os.path.join(OUT_DIR, f"robot_camera_{timestamp}")
         try:
             # Convert to numpy
             if obs.dim() == 4:
                 img_np = obs[0].cpu().numpy()
             else:
                 img_np = obs.cpu().numpy()
-                    
+            
             # Convert to uint8
             if img_np.dtype != np.uint8:
                 if img_np.max() <= 1.0:
                     img_np = (img_np * 255).astype(np.uint8)
                 else:
                     img_np = np.clip(img_np, 0, 255).astype(np.uint8)
-                    
-            # Convert RGB to BGR for OpenCV
-            img_bgr = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
-
-            cv2.imwrite(f"{filename}.png", img_bgr)
-                    
+            
+            # Ensure shape is (H, W, 3)
+            if img_np.shape[0] in [1, 3] and img_np.shape[-1] != 3:
+                img_np = np.transpose(img_np, (1, 2, 0))
+            
+            # Write frame to video
+            video_writer.append_data(img_np)
         except Exception as error:
-            print(f"❌ save Image failed: {error}")
+            print(f"❌ save video frame failed: {error}")
+
+@atexit.register
+def close_video_writer():
+    try:
+        video_writer.close()
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":

@@ -51,6 +51,15 @@ class SpotCurtainEnvCfg(DirectRLEnvCfg):
         spawn= None
     )
 
+    bird_camera_cfg: CameraCfg = CameraCfg(
+        prim_path="/World/envs/env_.*/bridgeData/bird_camera/bird_camera/bird_camera",
+        update_period=0.1,
+        height=480,
+        width=640,
+        data_types=["rgb"],
+        spawn=None
+    )
+
     # scene
     scene: InteractiveSceneCfg = InteractiveSceneCfg(num_envs=4, env_spacing=4.0, replicate_physics=False)
 

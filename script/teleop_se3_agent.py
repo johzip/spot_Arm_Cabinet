@@ -10,12 +10,19 @@
 import argparse
 import sys
 import os
+import uuid
+import json
+import imageio
+import numpy as np
+import atexit
 
 #from omni.isaac.lab.app import AppLauncher
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
+
+from script.dataset_Collector import DROIDStyleDatasetCollector
 from isaaclab.app import AppLauncher
 
 # add argparse arguments
@@ -55,9 +62,16 @@ from isaaclab.sensors import save_images_to_file
 #from omni.isaac.lab.sensors import save_images_to_file
 
 
+# Generate a unique folder name for this execution
+EXECUTION_ID = str(uuid.uuid4())[:8]
+OUT_DIR = os.path.join("out", f"run_{EXECUTION_ID}")
+os.makedirs(OUT_DIR, exist_ok=True)
 
 def main():
     """Running keyboard teleoperation with Isaac Lab manipulation environment."""
+     # Initialize dataset collector
+    dataset_collector = DROIDStyleDatasetCollector(save_dir=OUT_DIR)
+
     # parse configuration
     env_cfg = parse_env_cfg(
         args_cli.task, device=args_cli.device, num_envs=args_cli.num_envs, use_fabric=not args_cli.disable_fabric
@@ -76,9 +90,15 @@ def main():
         )
     else:
         raise ValueError(f"Invalid device interface '{args_cli.teleop_device}'. Supported: 'keyboard'.")
-    # add teleoperation key for env reset
-    teleop_interface.add_callback("L", env.reset)
-    # print helper for keyboard
+    
+    # Add dataset collection callbacks
+    dataset_collector.start_episode(
+        language_instruction="Pick up object",
+    )
+    env.reset()
+    
+    
+    teleop_interface.add_callback("L", dataset_collector.end_episode)
     print(teleop_interface)
 
     # reset environment
@@ -90,12 +110,20 @@ def main():
     print(f"env.action_space.shape: {env.action_space.shape}")
     actions = torch.zeros(env.action_space.shape, dtype=torch.float32, device=args_cli.device)
 
+    step_counter = 0
+
     # simulate environment
     while simulation_app.is_running():
+        #TODO fix the pause logic currently I wish to wait for an event from teleop_interface
+        while not teleop_interface.event: #endless loop until event occurs
+            pass
+
         # run everything in inference mode
         with torch.inference_mode():
             obs_dict = env.step(actions)[0]
             obs = obs_dict["rgb"]
+
+            safeObsImageToFile(obs)
 
             arm_delta_pose, gripper_command, base_delta_com, finish_flag = teleop_interface.advance()
 
@@ -107,7 +135,33 @@ def main():
             
             actions= torch.concat([base_delta_com, arm_delta_pose, gripper_actions], dim=1)
             
-            #actions= torch.concat([base_delta_com, arm_delta_pose], dim=1)
+            # Collect dataset step if episode is active
+            if dataset_collector.current_episode is not None:
+                # Get robot state from environment
+                robot_state = {
+                    "ee_pos": env.unwrapped.arm_ee_pos_w[0].cpu().numpy() if hasattr(env.unwrapped, 'arm_ee_pos_w') else None,
+                    "ee_quat": env.unwrapped.arm_ee_quat_w[0].cpu().numpy() if hasattr(env.unwrapped, 'arm_ee_quat_w') else None,
+                    "joint_pos": env.unwrapped.robot.data.joint_pos[0].cpu().numpy() if hasattr(env.unwrapped, 'robot') else None,
+                    # TODO: Add more robot state fields as needed
+                }
+                
+                # Check if this should be terminal step (e.g., if finish_flag or specific key pressed)
+                is_terminal = finish_flag  # or some other condition
+                
+                dataset_collector.add_step(
+                    obs_dict=obs_dict,
+                    action=actions[0],  # Single environment action
+                    robot_state=robot_state,
+                    step_idx=step_counter,
+                    is_terminal=is_terminal
+                )
+                
+                step_counter += 1
+                
+                if is_terminal:
+                    dataset_collector.end_episode()
+                    step_counter = 0
+                    print("🏁 Episode auto-ended due to finish flag")
 
             if finish_flag:
                 env.close()
@@ -116,6 +170,44 @@ def main():
 
     # close the simulator
     env.close()
+
+
+# Initialize video writer globally
+VIDEO_PATH = os.path.join(OUT_DIR, "vla_camera_video.mp4")
+video_writer = imageio.get_writer(VIDEO_PATH, fps=15)
+
+def safeObsImageToFile(obs):
+    if obs is not None:
+        try:
+            # Convert to numpy
+            if obs.dim() == 4:
+                img_np = obs[0].cpu().numpy()
+            else:
+                img_np = obs.cpu().numpy()
+            
+            # Convert to uint8
+            if img_np.dtype != np.uint8:
+                if img_np.max() <= 1.0:
+                    img_np = (img_np * 255).astype(np.uint8)
+                else:
+                    img_np = np.clip(img_np, 0, 255).astype(np.uint8)
+            
+            # Ensure shape is (H, W, 3)
+            if img_np.shape[0] in [1, 3] and img_np.shape[-1] != 3:
+                img_np = np.transpose(img_np, (1, 2, 0))
+            
+            # Write frame to video
+            video_writer.append_data(img_np)
+        except Exception as error:
+            print(f"❌ save video frame failed: {error}")
+
+@atexit.register
+def close_video_writer():
+    try:
+        video_writer.close()
+    except Exception:
+        pass
+
 
 
 if __name__ == "__main__":

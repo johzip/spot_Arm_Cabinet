@@ -9,6 +9,7 @@ import numpy as np
 import weakref
 from collections.abc import Callable
 from scipy.spatial.transform import Rotation
+from script.dataset_Collector import DROIDStyleDatasetCollector
 
 import carb
 import omni
@@ -61,6 +62,7 @@ class MMKeyboard(DeviceBase):
         self._additional_callbacks = dict()
         self._finish = False
         self._value = None
+        self.event = False
 
     def __del__(self):
         """Release the keyboard interface."""
@@ -153,9 +155,11 @@ class MMKeyboard(DeviceBase):
             https://docs.omniverse.nvidia.com/dev-guide/latest/programmer_ref/input-devices/keyboard.html
         """
         # apply the command when pressed
+        self.event = True
         if event.type == carb.input.KeyboardEventType.KEY_PRESS:
             if event.input.name == "L":
                 self._finish = True
+                
 
             if event.input.name in ["NUMPAD_7", "NUMPAD_8", "NUMPAD_4", "NUMPAD_5", "NUMPAD_1", "NUMPAD_2"]:
                 #3: test this, rework action_map
@@ -188,7 +192,7 @@ class MMKeyboard(DeviceBase):
 
             elif event.input.name in ["NUMPAD_7", "NUMPAD_8", "NUMPAD_4", "NUMPAD_5", "NUMPAD_1", "NUMPAD_2"]:
                 self._gripper_command -= self._INPUT_KEY_MAPPING[event.input.name]
-            
+        self.event = False
         return True
 
     def _create_key_bindings(self):

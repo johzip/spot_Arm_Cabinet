@@ -406,17 +406,15 @@ class SpotCurtainEnv( DirectRLEnv):
         current_joint_pos = self.robot.data.joint_pos
         current_joint_vel = self.robot.data.joint_vel
         body_state_w = self.robot.data.body_state_w
-        gripper_comd = None
 
         if(self.vla_mode):
             actions = actions.clone()
             actions[:, 3:6] = actions[:, 3:6] * 0.2 
             #TODO:scale the action commands properly with maximum output and min input thresholds
             transformed_pos_cmd, transformed_ori_cmd = self.calculate_arm_goal(actions)
-            gripper_cmd = actions[:, 9:12]
 
-            print(transformed_ori_cmd)#tensor([[ 0.9919, -0.0675, -0.0304,  0.1030]], device='cuda:0')
-            print("type:", type(transformed_ori_cmd))#type: <class 'torch.Tensor'>
+            #print(transformed_ori_cmd)#tensor([[ 0.9919, -0.0675, -0.0304,  0.1030]], device='cuda:0')
+            #print("type:", type(transformed_ori_cmd))#type: <class 'torch.Tensor'>
             
             
 
@@ -432,7 +430,6 @@ class SpotCurtainEnv( DirectRLEnv):
             arm_ori = None
             if actions[:,3:].any()!=0:
                 arm_pos = actions[:,3:6]  # arm position (3) + arm rotation (3)
-                gripper_comd = actions[:,9:]  # gripper_open + wrist_rot + wrist_pitch
                 axis_angle = actions[0:,6:9].cpu().numpy()
                 quat_numpy = axisangle2quat(axis_angle)  # Convert Euler to Quaternion
                 
@@ -442,8 +439,8 @@ class SpotCurtainEnv( DirectRLEnv):
                     device=actions.device, 
                     dtype=torch.float32
                 )
-                print(arm_ori)#[0. 0. 0. 1.]
-                print("type:", type(arm_ori))#type: <class 'numpy.ndarray'>
+                #print(arm_ori)#[0. 0. 0. 1.]
+                #print("type:", type(arm_ori))#type: <class 'numpy.ndarray'>
 
             action,index,success = self.controller.compute(lin_vel, ang_vel,  gravity_b,
                                                     current_joint_pos, current_joint_vel,
@@ -457,59 +454,36 @@ class SpotCurtainEnv( DirectRLEnv):
         #if not all(success):
             # this means IK failed because of unreachable target position. so use arm position command to move robot base instead.
 
+        gripper_comd = None
         #self.robot_dof_targets[:, index] = action
         for joint_action, joint_indices in zip(action, index):
             self.robot_dof_targets[:, joint_indices] = joint_action
-    
+            #print("after Kinematic solver, what joints are addressed?")
+            #print (f"Joint indices: {joint_indices}") # Joint indices: [4, 9, 14, 15, 16, 17, 18]
+            joint_names = [self.robot.joint_names[i] for i in joint_indices]
+            #print (f"Joint names: {joint_names}") # Joint names: ['arm0_sh0', 'arm0_sh1', 'arm0_el0', 'arm0_el1', 'arm0_wr0', 'arm0_wr1', 'arm0_f1x']
+            #print (f"Joint actions: {joint_action}")   # Joint actions: tensor([[-0.2315, -1.9298,  2.9268,  0.5250, -0.0306, -0.8258, -1.0711]], device='cuda:0')
+            if 'arm0_f1x' in joint_names:
+                f1x_pos = joint_names.index('arm0_f1x')
+                #gripper_comd = joint_action[:, f1x_pos:f1x_pos+1].clone()  # Extract the value at the arm0_f1x position
 
         if gripper_comd is not None and torch.any(gripper_comd != 0):            
             # Find joint indices for wrist and gripper
             joint_names = self.robot.joint_names
-            wr0_idx = joint_names.index('arm0_wr0') if 'arm0_wr0' in joint_names else None
-            wr1_idx = joint_names.index('arm0_wr1') if 'arm0_wr1' in joint_names else None  
             f1x_idx = joint_names.index('arm0_f1x') if 'arm0_f1x' in joint_names else None
             
             # Apply gripper commands directly
             if f1x_idx is not None:
-                gripper_step = gripper_comd[:, 0] * 5.0  # Increased to 5° per step
                 current_f1x = current_joint_pos[:, f1x_idx]
                 
                 # Apply incremental movement
-                new_f1x = current_f1x + torch.deg2rad(gripper_step)
+                new_f1x = current_f1x + torch.deg2rad(gripper_comd)
                 
                 # Clamp to joint limits: -90° to 0°
                 self.robot_dof_targets[:, f1x_idx] = torch.clamp(
                     new_f1x, 
                     torch.deg2rad(torch.tensor(-90.0, device=self.sim.device)), 
                     torch.deg2rad(torch.tensor(0.0, device=self.sim.device))
-                )
-                
-            if wr0_idx is not None and gripper_comd.shape[1] > 1:
-                wrist_rotation_step = gripper_comd[:, 1] * 3.0  # Tripled from 1.0 to 3.0
-                current_wr0 = current_joint_pos[:, wr0_idx]
-                
-                # Apply incremental movement
-                new_wr0 = current_wr0 + torch.deg2rad(wrist_rotation_step)
-                
-                # Clamp to joint limits: -105° to 105°
-                self.robot_dof_targets[:, wr0_idx] = torch.clamp(
-                    new_wr0,
-                    torch.deg2rad(torch.tensor(-105.0, device=self.sim.device)),
-                    torch.deg2rad(torch.tensor(105.0, device=self.sim.device))
-                )
-                
-            if wr1_idx is not None and gripper_comd.shape[1] > 2:
-                wrist_pitch_step = gripper_comd[:, 2] * 3.0  # Reduced step size
-                current_wr1 = current_joint_pos[:, wr1_idx]
-                
-                # Apply incremental movement
-                new_wr1 = current_wr1 + torch.deg2rad(wrist_pitch_step)
-                
-                # Clamp to joint limits: -165° to 165°
-                self.robot_dof_targets[:, wr1_idx] = torch.clamp(
-                    new_wr1,
-                    torch.deg2rad(torch.tensor(-165.0, device=self.sim.device)),
-                    torch.deg2rad(torch.tensor(165.0, device=self.sim.device))
                 )
 
         limit = self.robot.data.joint_pos_limits[:, :, :]

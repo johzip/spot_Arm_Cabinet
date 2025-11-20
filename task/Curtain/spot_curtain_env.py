@@ -56,7 +56,7 @@ class SpotCurtainEnvCfg(DirectRLEnvCfg):
         update_period=0.1,
         height=480,
         width=640,
-        data_types=["rgb"],
+        data_types=["overhead_rgb"],
         spawn=None
     )
 
@@ -107,6 +107,7 @@ class SpotCurtainEnv( DirectRLEnv):
         
         self.robot = Articulation(self.cfg.robot_cfg)        
         self._camera = Camera(self.cfg.camera_cfg)
+        self._bird_camera = Camera(self.cfg.bird_camera_cfg)
         
         spawn_ground_plane(prim_path="/World/ground", cfg=GroundPlaneCfg())
 
@@ -140,6 +141,8 @@ class SpotCurtainEnv( DirectRLEnv):
         self.controller = OperationSpaceController(num_robot=self.num_envs,
                                                    device=self.device,
                                                    )
+
+        #TODO add the bird view camera to the scene as well as wrist camera
 
         # Add lights
         light_cfg = sim_utils.DomeLightCfg(intensity=2000.0)
@@ -268,15 +271,29 @@ class SpotCurtainEnv( DirectRLEnv):
     def _get_image_obs(self):
         camera_data = {}
         process = False
-        for data_type in self.cfg.camera_cfg.data_types:
+        #TODO add the bird view camera to the scene as well as wrist camera
+        for data_type in self.cfg.bird_camera_cfg.data_types:
+            if data_type == "overhead_rgb":
+                tem_data = self._bird_camera.data.output[data_type].to(torch.uint8)  # / 255.0  # 【1，480，640，3】
+                if process:
+                    encode_feature = self.encoder.extract_dino_features(tem_data)
+                    camera_data['dino_feature'] = encode_feature
+            else:
+                tem_data = self._bird_camera.data.output[data_type]
+
+            camera_data[data_type] = tem_data
+
+        for data_type in self.cfg.camera_cfg.data_types :
             if data_type == "rgb":
                 tem_data = self._camera.data.output[data_type].to(torch.uint8)  # / 255.0  # 【1，480，640，3】
                 if process:
                     encode_feature = self.encoder.extract_dino_features(tem_data)
                     camera_data['dino_feature'] = encode_feature
-            elif data_type == "depth":
-                tem_data = self._camera.data.output[data_type]
-                tem_data[tem_data == float("inf")] = 0
+            elif data_type == "wrist_rgb":
+                tem_data = self._camera.data.output[data_type].to(torch.uint8)  # / 255.0  # 【1，480，640，3】
+                if process:
+                    encode_feature = self.encoder.extract_dino_features(tem_data)
+                    camera_data['dino_feature'] = encode_feature
             else:
                 tem_data = self._camera.data.output[data_type]
 

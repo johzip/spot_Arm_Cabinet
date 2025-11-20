@@ -10,6 +10,7 @@
 import argparse
 import sys
 import os
+import time
 import uuid
 import json
 import imageio
@@ -115,15 +116,16 @@ def main():
     # simulate environment
     while simulation_app.is_running():
         #TODO fix the pause logic currently I wish to wait for an event from teleop_interface
-        while not teleop_interface.event: #endless loop until event occurs
-            pass
+        #while not teleop_interface.event: #endless loop until event occurs
+        #    time.sleep(0.01)
+        #    try:
+        #        simulation_app.update()
+        #    except:
+        #        pass
 
         # run everything in inference mode
         with torch.inference_mode():
             obs_dict = env.step(actions)[0]
-            obs = obs_dict["rgb"]
-
-            safeObsImageToFile(obs)
 
             arm_delta_pose, gripper_command, base_delta_com, finish_flag = teleop_interface.advance()
 
@@ -170,43 +172,6 @@ def main():
 
     # close the simulator
     env.close()
-
-
-# Initialize video writer globally
-VIDEO_PATH = os.path.join(OUT_DIR, "vla_camera_video.mp4")
-video_writer = imageio.get_writer(VIDEO_PATH, fps=15)
-
-def safeObsImageToFile(obs):
-    if obs is not None:
-        try:
-            # Convert to numpy
-            if obs.dim() == 4:
-                img_np = obs[0].cpu().numpy()
-            else:
-                img_np = obs.cpu().numpy()
-            
-            # Convert to uint8
-            if img_np.dtype != np.uint8:
-                if img_np.max() <= 1.0:
-                    img_np = (img_np * 255).astype(np.uint8)
-                else:
-                    img_np = np.clip(img_np, 0, 255).astype(np.uint8)
-            
-            # Ensure shape is (H, W, 3)
-            if img_np.shape[0] in [1, 3] and img_np.shape[-1] != 3:
-                img_np = np.transpose(img_np, (1, 2, 0))
-            
-            # Write frame to video
-            video_writer.append_data(img_np)
-        except Exception as error:
-            print(f"❌ save video frame failed: {error}")
-
-@atexit.register
-def close_video_writer():
-    try:
-        video_writer.close()
-    except Exception:
-        pass
 
 
 

@@ -1,6 +1,8 @@
 import os
 import json
 import numpy as np
+import imageio
+import atexit
 import torch
 import tensorflow as tf
 from typing import Dict, Any, List, Optional
@@ -23,14 +25,16 @@ class DROIDStyleDatasetCollector:
         self.episode_steps = []
         self.episode_id = None
         self.recording_start_time = None
+        self.VIDEO_PATH = os.path.join(self.save_dir, "vla_camera_video.mp4")
+        self.video_writer = imageio.get_writer(self.VIDEO_PATH, fps=15)
         
-        print(f"📁 Dataset collector initialized. Saving to: {save_dir}")
+        print(f"Dataset collector initialized. Saving to: {save_dir}")
     
     def start_episode(self, language_instruction: str, 
                      language_instruction_2: str = "", 
                      language_instruction_3: str = ""):
         """Start collecting a new episode"""
-        print("🚀 Starting new episode collection...")
+        print("Starting new episode collection...")
         
         self.episode_id = f"episode_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{str(uuid.uuid4())[:8]}"
         self.recording_start_time = datetime.now()
@@ -58,6 +62,44 @@ class DROIDStyleDatasetCollector:
         print(f"🎬 Started episode: {self.episode_id}")
         print(f"📝 Instruction: {language_instruction}")
     
+
+    # Initialize video writer globally
+    
+
+    def safeObsImageToFile(self, obs):
+        if obs is not None:
+            try:
+                # Convert to numpy
+                if obs.dim() == 4:
+                    img_np = obs[0].cpu().numpy()
+                else:
+                    img_np = obs.cpu().numpy()
+                
+                # Convert to uint8
+                if img_np.dtype != np.uint8:
+                    if img_np.max() <= 1.0:
+                        img_np = (img_np * 255).astype(np.uint8)
+                    else:
+                        img_np = np.clip(img_np, 0, 255).astype(np.uint8)
+                
+                # Ensure shape is (H, W, 3)
+                if img_np.shape[0] in [1, 3] and img_np.shape[-1] != 3:
+                    img_np = np.transpose(img_np, (1, 2, 0))
+                
+                # Write frame to video
+                self.video_writer.append_data(img_np)
+            except Exception as error:
+                print(f"❌ save video frame failed: {error}")
+
+    @atexit.register
+    def close_video_writer(self):
+        try:
+            self.video_writer.close()
+        except Exception:
+            pass
+
+
+
     def add_step(self, 
                 obs_dict: Dict[str, Any],
                 action: torch.Tensor,
@@ -83,10 +125,16 @@ class DROIDStyleDatasetCollector:
         is_last = is_terminal
         
         image_paths = {}
+        wrist_path = ""
+        exterior_1_path = ""
+        exterior_2_path = ""
     
         # Extract different camera views from obs_dict
         if "rgb" in obs_dict:
             # Main camera (treat as exterior_1)
+            obs = obs_dict["rgb"]
+            self.safeObsImageToFile(obs)
+
             exterior_1_path = os.path.join(self.episode_folder, "images", f"step_{step_idx:06d}_exterior_1.png")
             self._save_image(obs_dict["rgb"], exterior_1_path)
             image_paths["exterior_1"] = exterior_1_path

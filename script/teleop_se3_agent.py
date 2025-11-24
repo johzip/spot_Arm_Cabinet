@@ -21,6 +21,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from isaaclab.app import AppLauncher
+from script.dataset_Collector import DROIDStyleDatasetCollector
 
 # add argparse arguments
 parser = argparse.ArgumentParser(description="OpenVLA-enhanced keyboard teleoperation.")
@@ -106,6 +107,8 @@ def main():
     else:
         vlaMode = False
 
+    dataset_collector = DROIDStyleDatasetCollector(save_dir=OUT_DIR)
+
     # parse configuration
     env_cfg = parse_env_cfg(
         args_cli.task, device=args_cli.device, num_envs=args_cli.num_envs, use_fabric=not args_cli.disable_fabric
@@ -125,8 +128,14 @@ def main():
     else:
         raise ValueError(f"Invalid device interface '{args_cli.teleop_device}'. Supported: 'keyboard'.")
     
+    # start dataset collection
+    dataset_collector.start_episode(
+        language_instruction="Pick up object",
+    )
+    env.reset()
+
     # add teleoperation key for env reset
-    teleop_interface.add_callback("L", env.reset)
+    teleop_interface.add_callback("L", dataset_collector.end_episode)
 
     # print helper for keyboard
     print(teleop_interface)
@@ -139,6 +148,8 @@ def main():
 
     openvla_counter = 0
     suggested_action = None
+
+    step_counter = 0
 
     # simulate environment
     while simulation_app.is_running():
@@ -200,6 +211,33 @@ def main():
                 # Manual control
                 actions = torch.concat([base_delta_com, arm_delta_pose, gripper_actions], dim=1)
 
+
+            if dataset_collector.current_episode is not None:
+                # Get robot state from environment
+                robot_state = {
+                    "ee_pos": env.unwrapped.arm_ee_pos_w[0].cpu().numpy() if hasattr(env.unwrapped, 'arm_ee_pos_w') else None,
+                    "ee_quat": env.unwrapped.arm_ee_quat_w[0].cpu().numpy() if hasattr(env.unwrapped, 'arm_ee_quat_w') else None,
+                    "joint_pos": env.unwrapped.robot.data.joint_pos[0].cpu().numpy() if hasattr(env.unwrapped, 'robot') else None,
+                    # TODO: Add more robot state fields as needed
+                }
+                
+                # Check if this should be terminal step (e.g., if finish_flag or specific key pressed)
+                is_terminal = finish_flag  # or some other condition
+                
+                dataset_collector.add_step(
+                    obs_dict=obs_dict,
+                    action=actions[0],  # Single environment action
+                    robot_state=robot_state,
+                    step_idx=step_counter,
+                    is_terminal=is_terminal
+                )
+                
+                step_counter += 1
+                
+                if is_terminal:
+                    dataset_collector.end_episode()
+                    step_counter = 0
+                    print("🏁 Episode auto-ended due to finish flag")
 
             if finish_flag:
                 env.close()

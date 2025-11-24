@@ -105,9 +105,9 @@ class SpotCurtainEnv( DirectRLEnv):
     def _setup_scene(self,) :
         from isaaclab.sim.spawners.from_files import spawn_from_usd
         
-        self.robot = Articulation(self.cfg.robot_cfg)        
+        self.robot = Articulation(self.cfg.robot_cfg)
         self._camera = Camera(self.cfg.camera_cfg)
-        self._bird_camera = Camera(self.cfg.bird_camera_cfg)
+        root = os.getcwd()
         
         spawn_ground_plane(prim_path="/World/ground", cfg=GroundPlaneCfg())
 
@@ -143,7 +143,17 @@ class SpotCurtainEnv( DirectRLEnv):
                                                    )
 
         #TODO add the bird view camera to the scene as well as wrist camera
-
+            #bird_camera
+        bird_camera_path=root+'/asset/objects/bird_camera.usd'
+        bird_camera_cfg = sim_utils.UsdFileCfg(usd_path=bird_camera_path)
+        spawn_from_usd(
+            prim_path="/World/envs/env_{env_idx}"+"/bird_camera",
+            cfg=bird_camera_cfg,
+            translation=(1.5, 1.3, 1.6),
+            orientation=(0.66, 0.24, 0.24, 0.66),  # x, y, z, w
+        )
+        
+        self._bird_camera = Camera(self.cfg.bird_camera_cfg)
         # Add lights
         light_cfg = sim_utils.DomeLightCfg(intensity=2000.0)
         light_cfg.func("/World/Light", light_cfg)

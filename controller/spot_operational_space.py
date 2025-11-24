@@ -92,12 +92,16 @@ class OperationSpaceController:
             self.arm_ctrl.set_robot_base_pose(robot_base_pose[:,:3], robot_base_pose[:,3:])
             current_arm_joints_pos = current_arm_joints_pos.cpu().numpy()
         
-            #arm_rot_command = [arm_rot_command[i]  if arm_rot_command[i].any() else None for i in range(self.num_robot)]
-            #print(f"current_arm_ee_pose: {ee_pose_w[:,:3]}")
+            target_pos = arm_pos_command.cpu().numpy() if arm_pos_command is not None else None
+            target_ori = arm_ori_command.cpu().numpy() if arm_ori_command is not None else None
+            
+            print("opspace: target_pos:", target_pos)
+            print("opspace: target_ori:", target_ori)
+
             arm_joint_act, arm_success = self.arm_ctrl.compute_inverse_kinematics(
                 warm_start = current_arm_joints_pos,
-                target_position = arm_pos_command.cpu().numpy(),
-                target_orientation = arm_ori_command.cpu().numpy(),
+                target_position = target_pos,
+                target_orientation = target_ori,
             )
             
             arm_joint_act = torch.from_numpy(arm_joint_act).to(self.device, torch.float32)

@@ -428,6 +428,8 @@ class SpotCurtainEnv( DirectRLEnv):
         else:
             arm_pos = None
             arm_ori = None
+            target_arm_pos = None
+
             if actions[:,3:].any()!=0:
                 arm_pos = actions[:,3:6]  # arm position (3) + arm rotation (3)
                 axis_angle = actions[0:,6:9].cpu().numpy()
@@ -439,15 +441,18 @@ class SpotCurtainEnv( DirectRLEnv):
                     device=actions.device, 
                     dtype=torch.float32
                 )
-                #print(arm_ori)#[0. 0. 0. 1.]
-                #print("type:", type(arm_ori))#type: <class 'numpy.ndarray'>
 
+                target_arm_pos = self.arm_ee_pos_w + arm_pos  # [num_envs, 3] + [num_envs, 3]
+            else:
+                target_arm_pos = self.arm_ee_pos_w  # Keep current position
+
+
+            print("target_arm_pos:", target_arm_pos)
             action,index,success = self.controller.compute(lin_vel, ang_vel,  gravity_b,
                                                     current_joint_pos, current_joint_vel,
                                                     body_state_w,
                                                     actions[:,:3], #base
-                                                    arm_pos,
-                                                    arm_ori)
+                                                    target_arm_pos)
         
         
         #TODO:
@@ -458,11 +463,7 @@ class SpotCurtainEnv( DirectRLEnv):
         #self.robot_dof_targets[:, index] = action
         for joint_action, joint_indices in zip(action, index):
             self.robot_dof_targets[:, joint_indices] = joint_action
-            #print("after Kinematic solver, what joints are addressed?")
-            #print (f"Joint indices: {joint_indices}") # Joint indices: [4, 9, 14, 15, 16, 17, 18]
             joint_names = [self.robot.joint_names[i] for i in joint_indices]
-            #print (f"Joint names: {joint_names}") # Joint names: ['arm0_sh0', 'arm0_sh1', 'arm0_el0', 'arm0_el1', 'arm0_wr0', 'arm0_wr1', 'arm0_f1x']
-            #print (f"Joint actions: {joint_action}")   # Joint actions: tensor([[-0.2315, -1.9298,  2.9268,  0.5250, -0.0306, -0.8258, -1.0711]], device='cuda:0')
             if 'arm0_f1x' in joint_names:
                 f1x_pos = joint_names.index('arm0_f1x')
                 #gripper_comd = joint_action[:, f1x_pos:f1x_pos+1].clone()  # Extract the value at the arm0_f1x position
@@ -488,30 +489,6 @@ class SpotCurtainEnv( DirectRLEnv):
 
         limit = self.robot.data.joint_pos_limits[:, :, :]
         self.robot_dof_targets = torch.clamp(self.robot_dof_targets, limit[:, :, 0], limit[:, :, 1])
-
-    def _pre_physics_step_original(self, actions):
-
-        self.actions = actions.clone().to(self.sim.device)
-        lin_vel = self.robot.data.root_lin_vel_b
-        ang_vel = self.robot.data.root_ang_vel_b
-        gravity_b = self.robot.data.projected_gravity_b
-        current_joint_pos = self.robot.data.joint_pos
-        current_joint_vel = self.robot.data.joint_vel
-        body_state_w = self.robot.data.body_state_w
-        arm_comd =None
-        if self.actions[:,3:].any()!=0:
-            arm_comd = self.actions[:,3:]
-
-        # do not set the base_pose if arm related to body frame
-        action,index,_ = self.controller.compute(lin_vel, ang_vel,  gravity_b,
-                                                  current_joint_pos, current_joint_vel,
-                                                  body_state_w,  # ,y,x
-                                                  self.actions[:,:3],
-                                                  arm_comd) #, success
-        self.robot_dof_targets[:, index] = action
-        limit = self.robot.data.joint_limits[:, :, :]
-        self.robot_dof_targets = torch.clamp(self.robot_dof_targets, limit[:, :, 0], limit[:, :, 1])
-
 
     def _apply_action(self):
         self.robot.set_joint_position_target(self.robot_dof_targets) # 10 times

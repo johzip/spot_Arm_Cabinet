@@ -444,10 +444,8 @@ class SpotCurtainEnv( DirectRLEnv):
 
                 target_arm_pos = self.arm_ee_pos_w + arm_pos  # [num_envs, 3] + [num_envs, 3]
             else:
-                target_arm_pos = self.arm_ee_pos_w  # Keep current position
+                target_arm_pos = None
 
-
-            print("target_arm_pos:", target_arm_pos)
             action,index,success = self.controller.compute(lin_vel, ang_vel,  gravity_b,
                                                     current_joint_pos, current_joint_vel,
                                                     body_state_w,

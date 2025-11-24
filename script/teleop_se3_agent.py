@@ -210,7 +210,7 @@ def main():
             else:
                 # Manual control
                 actions = torch.concat([base_delta_com, arm_delta_pose, gripper_actions], dim=1)
-
+                #print(f"Step actions: base={base_delta_com[0].tolist()}, arm={arm_delta_pose[0].tolist()}, gripper={gripper_actions[0].tolist()}")
 
             if dataset_collector.current_episode is not None:
                 # Get robot state from environment

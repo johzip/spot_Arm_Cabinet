@@ -52,11 +52,11 @@ class SpotCurtainEnvCfg(DirectRLEnvCfg):
     )
 
     bird_camera_cfg: CameraCfg = CameraCfg(
-        prim_path="/World/envs/env_.*/bridgeData/bird_camera/bird_camera/bird_camera",
+        prim_path="/World/envs/env_.*/bird_camera/bird_camera/bird_camera",
         update_period=0.1,
         height=480,
         width=640,
-        data_types=["overhead_rgb"],
+        data_types=["rgb"],
         spawn=None
     )
 
@@ -64,14 +64,6 @@ class SpotCurtainEnvCfg(DirectRLEnvCfg):
     scene: InteractiveSceneCfg = InteractiveSceneCfg(num_envs=4, env_spacing=4.0, replicate_physics=False)
 
 
-# pre-physics step calls
-#   |-- _pre_physics_step(action)
-#   |-- _apply_action()
-# post-physics step calls
-#   |-- _get_dones()
-#   |-- _get_rewards()
-#   |-- _reset_idx(env_ids)
-#   |-- _get_observations()
 
 class SpotCurtainEnv( DirectRLEnv):
     cfg: SpotCurtainEnvCfg
@@ -143,17 +135,19 @@ class SpotCurtainEnv( DirectRLEnv):
                                                    )
 
         #TODO add the bird view camera to the scene as well as wrist camera
-            #bird_camera
+        #bird_camera
         bird_camera_path=root+'/asset/objects/bird_camera.usd'
         bird_camera_cfg = sim_utils.UsdFileCfg(usd_path=bird_camera_path)
         spawn_from_usd(
-            prim_path="/World/envs/env_{env_idx}"+"/bird_camera",
+            prim_path=f"/World/envs/env_{env_idx}"+"/bird_camera",
             cfg=bird_camera_cfg,
             translation=(1.5, 1.3, 1.6),
             orientation=(0.66, 0.24, 0.24, 0.66),  # x, y, z, w
         )
         
         self._bird_camera = Camera(self.cfg.bird_camera_cfg)
+        self.scene.sensors["bird_camera"] = self._bird_camera
+
         # Add lights
         light_cfg = sim_utils.DomeLightCfg(intensity=2000.0)
         light_cfg.func("/World/Light", light_cfg)
@@ -195,7 +189,7 @@ class SpotCurtainEnv( DirectRLEnv):
         #    arm_rx,    arm_ry,    arm_rz,       # Arm rotation delta (3D)
         #    gripper_open, wrist_rot, wrist_pitch # Gripper/wrist commands (3D)
         #]
-
+        
         self.actions = actions.clone().to(self.sim.device)
         lin_vel = self.robot.data.root_lin_vel_b
         ang_vel = self.robot.data.root_ang_vel_b
@@ -283,7 +277,7 @@ class SpotCurtainEnv( DirectRLEnv):
         process = False
         #TODO add the bird view camera to the scene as well as wrist camera
         for data_type in self.cfg.bird_camera_cfg.data_types:
-            if data_type == "overhead_rgb":
+            if data_type == "rgb":
                 tem_data = self._bird_camera.data.output[data_type].to(torch.uint8)  # / 255.0  # 【1，480，640，3】
                 if process:
                     encode_feature = self.encoder.extract_dino_features(tem_data)
@@ -295,11 +289,6 @@ class SpotCurtainEnv( DirectRLEnv):
 
         for data_type in self.cfg.camera_cfg.data_types :
             if data_type == "rgb":
-                tem_data = self._camera.data.output[data_type].to(torch.uint8)  # / 255.0  # 【1，480，640，3】
-                if process:
-                    encode_feature = self.encoder.extract_dino_features(tem_data)
-                    camera_data['dino_feature'] = encode_feature
-            elif data_type == "wrist_rgb":
                 tem_data = self._camera.data.output[data_type].to(torch.uint8)  # / 255.0  # 【1，480，640，3】
                 if process:
                     encode_feature = self.encoder.extract_dino_features(tem_data)

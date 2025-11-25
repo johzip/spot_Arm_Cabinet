@@ -95,8 +95,6 @@ class OperationSpaceController:
             target_pos = arm_pos_command.cpu().numpy() if arm_pos_command is not None else None
             target_ori = arm_ori_command.cpu().numpy() if arm_ori_command is not None else None
             
-            print("opspace: target_pos:", target_pos)
-            print("opspace: target_ori:", target_ori)
 
             arm_joint_act, arm_success = self.arm_ctrl.compute_inverse_kinematics(
                 warm_start = current_arm_joints_pos,

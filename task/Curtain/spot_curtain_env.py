@@ -60,6 +60,15 @@ class SpotCurtainEnvCfg(DirectRLEnvCfg):
         spawn=None
     )
 
+    side_camera_cfg: CameraCfg = CameraCfg(
+        prim_path="/World/envs/env_.*/side_camera/bird_camera/bird_camera",
+        update_period=0.1,
+        height=480,
+        width=640,
+        data_types=["rgb"],
+        spawn=None
+    )
+
     # scene
     scene: InteractiveSceneCfg = InteractiveSceneCfg(num_envs=4, env_spacing=4.0, replicate_physics=False)
 
@@ -134,19 +143,31 @@ class SpotCurtainEnv( DirectRLEnv):
                                                    device=self.device,
                                                    )
 
-        #TODO add the bird view camera to the scene as well as wrist camera
         #bird_camera
         bird_camera_path=root+'/asset/objects/bird_camera.usd'
         bird_camera_cfg = sim_utils.UsdFileCfg(usd_path=bird_camera_path)
         spawn_from_usd(
             prim_path=f"/World/envs/env_{env_idx}"+"/bird_camera",
             cfg=bird_camera_cfg,
-            translation=(1.5, 1.3, 1.6),
+            translation=(1.3, 1.3, 1.5),
             orientation=(0.66, 0.24, 0.24, 0.66),  # x, y, z, w
         )
         
         self._bird_camera = Camera(self.cfg.bird_camera_cfg)
         self.scene.sensors["bird_camera"] = self._bird_camera
+
+        #side_camera
+        side_camera_path=root+'/asset/objects/bird_camera.usd'
+        side_camera_cfg = sim_utils.UsdFileCfg(usd_path=side_camera_path)
+        spawn_from_usd(
+            prim_path=f"/World/envs/env_{env_idx}"+"/side_camera",
+            cfg=side_camera_cfg,
+            translation=(0.65, 0.5, 0.6),
+            orientation=(0.7, 0.7, 0.0, 0.0),  # x, y, z, w
+        )
+        
+        self._side_camera = Camera(self.cfg.side_camera_cfg)
+        self.scene.sensors["side_camera"] = self._side_camera
 
         # Add lights
         light_cfg = sim_utils.DomeLightCfg(intensity=2000.0)
@@ -199,6 +220,10 @@ class SpotCurtainEnv( DirectRLEnv):
         body_state_w = self.robot.data.body_state_w
         arm_comd = None
         gripper_comd = None
+
+        self.arm_ee_pos_w = body_state_w[:, self.ee_idx, 0:3]
+        self.arm_ee_quat_w = body_state_w[:, self.ee_idx, 3:7]
+
         if self.actions[:,3:].any()!=0:
             arm_comd = self.actions[:,3:9]  # arm position (3) + arm rotation (3)
             gripper_comd = self.actions[:,9:]  # gripper_open + wrist_rot + wrist_pitch
@@ -274,6 +299,8 @@ class SpotCurtainEnv( DirectRLEnv):
 
     def _get_image_obs(self):
         camera_data = {}
+        bird_camera_data = {}
+        side_camera_data = {}
         process = False
         #TODO add the bird view camera to the scene as well as wrist camera
         for data_type in self.cfg.bird_camera_cfg.data_types:
@@ -281,11 +308,22 @@ class SpotCurtainEnv( DirectRLEnv):
                 tem_data = self._bird_camera.data.output[data_type].to(torch.uint8)  # / 255.0  # 【1，480，640，3】
                 if process:
                     encode_feature = self.encoder.extract_dino_features(tem_data)
-                    camera_data['dino_feature'] = encode_feature
+                    bird_camera_data['dino_feature'] = encode_feature
             else:
                 tem_data = self._bird_camera.data.output[data_type]
 
-            camera_data[data_type] = tem_data
+            bird_camera_data[data_type] = tem_data
+        
+        for data_type in self.cfg.side_camera_cfg.data_types:
+            if data_type == "rgb":
+                tem_data = self._side_camera.data.output[data_type].to(torch.uint8)  # / 255.0  # 【1，480，640，3】
+                if process:
+                    encode_feature = self.encoder.extract_dino_features(tem_data)
+                    side_camera_data['dino_feature'] = encode_feature
+            else:
+                tem_data = self._side_camera.data.output[data_type]
+
+            side_camera_data[data_type] = tem_data
 
         for data_type in self.cfg.camera_cfg.data_types :
             if data_type == "rgb":
@@ -298,12 +336,12 @@ class SpotCurtainEnv( DirectRLEnv):
 
             camera_data[data_type] = tem_data
 
-        return camera_data
+        return camera_data, bird_camera_data, side_camera_data
 
     def _get_observations(self, ):
         if self.cfg.camera:
-            camera_data = self._get_image_obs()
-            return camera_data
+            camera_data, bird_camera_data, side_camera_data = self._get_image_obs()
+            return {"camera": camera_data, "bird_camera": bird_camera_data, "side_camera": side_camera_data}
 
 
     def _get_states(self):

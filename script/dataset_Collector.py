@@ -8,6 +8,7 @@ import tensorflow as tf
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 import uuid
+from scipy.spatial.transform import Rotation as R
 
 class DROIDStyleDatasetCollector:
     def __init__(self, save_dir: str = "collected_data"):
@@ -25,10 +26,16 @@ class DROIDStyleDatasetCollector:
         self.episode_steps = []
         self.episode_id = None
         self.recording_start_time = None
-        self.VIDEO_PATH = os.path.join(self.save_dir, "vla_camera_video.mp4")
-        self.video_writer = imageio.get_writer(self.VIDEO_PATH, fps=15)
         
-        print(f"Dataset collector initialized. Saving to: {save_dir}")
+        # UPDATED: Multiple video writers for different cameras
+        self.MAIN_VIDEO_PATH = os.path.join(self.save_dir, "main_camera_video.mp4")
+        self.BIRD_VIDEO_PATH = os.path.join(self.save_dir, "bird_camera_video.mp4")
+        self.SIDE_VIDEO_PATH = os.path.join(self.save_dir, "side_camera_video.mp4")
+        
+        self.main_video_writer = imageio.get_writer(self.MAIN_VIDEO_PATH, fps=15)
+        self.bird_video_writer = imageio.get_writer(self.BIRD_VIDEO_PATH, fps=15)
+        self.side_video_writer = imageio.get_writer(self.SIDE_VIDEO_PATH, fps=15)
+        
     
     def start_episode(self, language_instruction: str, 
                      language_instruction_2: str = "", 
@@ -66,7 +73,8 @@ class DROIDStyleDatasetCollector:
     # Initialize video writer globally
     
 
-    def safeObsImageToFile(self, obs):
+    def safeObsImageToFile(self, obs, camera_type="main"):
+        """Save observation image to appropriate video file"""
         if obs is not None:
             try:
                 # Convert to numpy
@@ -86,15 +94,35 @@ class DROIDStyleDatasetCollector:
                 if img_np.shape[0] in [1, 3] and img_np.shape[-1] != 3:
                     img_np = np.transpose(img_np, (1, 2, 0))
                 
-                # Write frame to video
-                self.video_writer.append_data(img_np)
+                # UPDATED: Write to appropriate video writer based on camera type
+                if camera_type == "main":
+                    self.main_video_writer.append_data(img_np)
+                elif camera_type == "bird":
+                    self.bird_video_writer.append_data(img_np)
+                elif camera_type == "side":
+                    self.side_video_writer.append_data(img_np)
+                
             except Exception as error:
-                print(f"❌ save video frame failed: {error}")
+                print(f"❌ save {camera_type} video frame failed: {error}")
 
+    # UPDATED: Close all video writers
     @atexit.register
-    def close_video_writer(self):
+    def close_video_writers(self):
         try:
-            self.video_writer.close()
+            self.main_video_writer.close()
+            print("📹 Main camera video closed")
+        except Exception:
+            pass
+        
+        try:
+            self.bird_video_writer.close()
+            print("📹 Bird camera video closed")
+        except Exception:
+            pass
+        
+        try:
+            self.side_video_writer.close()
+            print("📹 Side camera video closed")
         except Exception:
             pass
 
@@ -129,26 +157,30 @@ class DROIDStyleDatasetCollector:
         exterior_1_path = ""
         exterior_2_path = ""
     
-        # Extract different camera views from obs_dict
-        if "rgb" in obs_dict:
-            # Main camera (treat as exterior_1)
-            obs = obs_dict["rgb"]
-            self.safeObsImageToFile(obs)
+        #print(f"obs_dict: {obs_dict}")
 
-            exterior_1_path = os.path.join(self.episode_folder, "images", f"step_{step_idx:06d}_exterior_1.png")
-            self._save_image(obs_dict["rgb"], exterior_1_path)
-            image_paths["exterior_1"] = exterior_1_path
-        
-        if "wrist_rgb" in obs_dict:
-            # Wrist camera
+        if "camera" in obs_dict and "rgb" in obs_dict["camera"]:
+            camera_rgb = obs_dict["camera"]["rgb"]  #
+            self.safeObsImageToFile(camera_rgb)  
+            
             wrist_path = os.path.join(self.episode_folder, "images", f"step_{step_idx:06d}_wrist.png")
-            self._save_image(obs_dict["wrist_rgb"], wrist_path)
-            image_paths["wrist"] = wrist_path
+            self._save_image(camera_rgb, wrist_path)
+            image_paths["wrist"] = wrist_path 
         
-        if "overhead_rgb" in obs_dict:
-            # Overhead/exterior camera 2
+        if "bird_camera" in obs_dict and "rgb" in obs_dict["bird_camera"]:
+            bird_rgb = obs_dict["bird_camera"]["rgb"] 
+            self.safeObsImageToFile(bird_rgb, camera_type="bird")  
+            
+            exterior_1_path = os.path.join(self.episode_folder, "images", f"step_{step_idx:06d}_exterior_1.png")
+            self._save_image(bird_rgb, exterior_1_path)
+            image_paths["exterior_1"] = exterior_1_path
+
+        if "side_camera" in obs_dict and "rgb" in obs_dict["side_camera"]:
+            side_rgb = obs_dict["side_camera"]["rgb"] 
+            self.safeObsImageToFile(side_rgb, camera_type="side")  
+            
             exterior_2_path = os.path.join(self.episode_folder, "images", f"step_{step_idx:06d}_exterior_2.png")
-            self._save_image(obs_dict["overhead_rgb"], exterior_2_path)
+            self._save_image(side_rgb, exterior_2_path)
             image_paths["exterior_2"] = exterior_2_path
         
         # Fallback: use main camera for missing views
@@ -269,14 +301,21 @@ class DROIDStyleDatasetCollector:
         return [0.0]  # Placeholder
     
     def _extract_cartesian_position(self, robot_state: Dict) -> List[float]:
-        """Extract 6D cartesian position [x, y, z, rx, ry, rz]"""
-        # TODO: Extract from robot_state["ee_pos"] and robot_state["ee_quat"]
-        return [0.0] * 6  # Placeholder
+        """Extract 6D cartesian position [x, y, z, rx, ry, rz] from robot_state"""
+        ee_pos = robot_state.get("ee_pos")
+        ee_quat = robot_state.get("ee_quat")
+        if ee_pos is not None and ee_quat is not None:
+            # Convert quaternion to Euler angles (rx, ry, rz)
+            euler = R.from_quat(ee_quat).as_euler('xyz')
+            return np.concatenate([ee_pos, euler]).tolist()
+        return [0.0] * 6
     
     def _extract_joint_position(self, robot_state: Dict) -> List[float]:
         """Extract joint positions"""
-        # TODO: Extract from robot_state["joint_pos"]
-        return [0.0] * 7  # Placeholder for 7 joints
+        joint_pos = robot_state.get("joint_pos")
+        if joint_pos is not None:
+            return joint_pos.tolist()
+        return [0.0] * 7  # Fallback for 7 joints
     
     def _extract_action_gripper_position(self, action: torch.Tensor) -> List[float]:
         """Extract gripper position command from action"""

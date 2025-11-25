@@ -14,6 +14,9 @@ from isaaclab.utils import configclass
 from isaaclab.sensors import CameraCfg,Camera
 from isaaclab.actuators import ImplicitActuatorCfg 
 
+import random
+import math
+
 from cfg.robotcfg import SPOT_CFG
 from controller.spot_operational_space import OperationSpaceController
 
@@ -114,16 +117,95 @@ class SpotCurtainEnv( DirectRLEnv):
 
         # Spawn cabinet directly 
         for env_idx in range(self.scene.cfg.num_envs):
-            cabinet_prim_path = f"/World/envs/env_{env_idx}/Cabinet"
-            cfg = sim_utils.UsdFileCfg(usd_path="/home/zipfelj/workspace/Articulate3D/full_scene_sim_ready/model_scene_video.usda")
+            #cabinet_prim_path = f"/World/envs/env_{env_idx}/Cabinet"
+            #cfg = sim_utils.UsdFileCfg(usd_path="/home/zipfelj/workspace/Articulate3D/full_scene_sim_ready/model_scene_video.usda")
+            #spawn_from_usd(
+            #    prim_path=cabinet_prim_path,
+            #    cfg=cfg,
+            #    translation=(1.2, 1.5, 0.39146906),
+            #    orientation=(0.69, 0, 0, 0.72),  # x, y, z, w
+            #)
+
+            bridgeData_prim_path = f"/World/envs/env_{env_idx}/bridgeData"
+            root = os.getcwd()
+            #table
+            table_path=root+'/asset/objects/small_wooden_table.usd'
+            table_cfg = sim_utils.UsdFileCfg(usd_path=table_path)
+            table_cfg.scale = (0.0002, 0.0002, 0.0002)
             spawn_from_usd(
-                prim_path=cabinet_prim_path,
-                cfg=cfg,
-                translation=(1.2, 1.5, 0.39146906),
-                orientation=(0.69, 0, 0, 0.72),  # x, y, z, w
+                prim_path=bridgeData_prim_path+"/table",
+                cfg=table_cfg,
+                translation=(0.93, 1.41, -0.152),
+                orientation=(0.7, 0.7, 0, 0),  # x, y, z, w
+                
             )
 
+            positions_list = self.generate_points()
+            random.shuffle(positions_list)
+
+            #TODO: spawn the banana at a random position on the table
+
+            #banana
+            banana_path=root+'/asset/objects/banana.usd'
+            banana_cfg = sim_utils.UsdFileCfg(usd_path=banana_path)
+            banana_cfg.scale = (0.002, 0.002, 0.002)
+            spawn_from_usd(
+                prim_path=bridgeData_prim_path+"/banana",
+                cfg=banana_cfg,
+                translation=positions_list.pop(0),
+                orientation=(0, 0, 0, 0),  # x, y, z, w
+            )
+
+            if(random.random()>0.3):
+                #scissor
+
+                scissor_path=root+'/asset/objects/scissors.usd'
+                scissor_cfg = sim_utils.UsdFileCfg(usd_path=scissor_path)
+                scissor_cfg.scale = (0.005, 0.005, 0.005)
+                spawn_from_usd(
+                    prim_path=bridgeData_prim_path+"/scissor",
+                    cfg=scissor_cfg,
+                    translation=positions_list.pop(0),
+                    orientation=(0, 0, 0, 0),  # x, y, z, w
+                )
+
+            if(random.random()>0.8):
+                pos = positions_list.pop(0)
+                #can
+                can_path=root+'/asset/objects/soda_can.usd'
+                can_cfg = sim_utils.UsdFileCfg(usd_path=can_path)
+                can_cfg.scale = (0.0005, 0.0005, 0.0005)
+                spawn_from_usd(
+                    prim_path=bridgeData_prim_path+"/soda_can",
+                    cfg=can_cfg,
+                    translation=(pos[0], pos[1], 0.323),
+                    orientation=(0, 0, 0, 0),  # x, y, z, w
+                )
+
+            if(random.random()>0.4):
+                #brush can be used instead ot banana or as clutter
+                brush_path=root+'/asset/objects/paint_brush.usd'
+                brush_cfg = sim_utils.UsdFileCfg(usd_path=brush_path)
+                brush_cfg.scale = (0.005, 0.005, 0.005)
+                spawn_from_usd(
+                    prim_path=bridgeData_prim_path+"/brush",
+                    cfg=brush_cfg,
+                    translation=positions_list.pop(0),
+                    orientation=(0, 0, 0, 0),  # x, y, z, w
+                )
             
+            if(random.random()>0.2):
+                pos = positions_list.pop(0)
+                #pot
+                pot_path=root+'/asset/objects/Pot.usd'
+                pot_cfg = sim_utils.UsdFileCfg(usd_path=pot_path)
+                pot_cfg.scale = (0.07, 0.07, 0.07)
+                spawn_from_usd(
+                    prim_path=bridgeData_prim_path+"/pot",
+                    cfg=pot_cfg,
+                    translation=(pos[0]+0.3, pos[1], 0.33),
+                    orientation=(0.7, 0.7, 0, 0),  # x, y, z, w
+                )
 
         # clone, filter, and replicate
         self.scene.clone_environments(copy_from_source=False)
@@ -240,7 +322,6 @@ class SpotCurtainEnv( DirectRLEnv):
         self.robot_dof_targets[:, index] = action
 
         if gripper_comd is not None and torch.any(gripper_comd != 0):
-            print(f"🤏 Applying gripper commands directly: {gripper_comd}")
             
             # Find joint indices for wrist and gripper
             joint_names = self.robot.joint_names
@@ -295,6 +376,22 @@ class SpotCurtainEnv( DirectRLEnv):
         limit = self.robot.data.joint_pos_limits[:, :, :]
         self.robot_dof_targets = torch.clamp(self.robot_dof_targets, limit[:, :, 0], limit[:, :, 1])
 
+    def generate_points(self, num_points=8, x_range=(0.5, 1.2), y_range=(1.0, 1.8), z_value=0.313, min_dist=0.15):
+        points = []
+        attempts = 0
+        max_attempts = 1000
+        while len(points) < num_points and attempts < max_attempts:
+            x = random.uniform(*x_range)
+            y = random.uniform(*y_range)
+            z = z_value
+            candidate = (x, y, z)
+            # Check distance to all existing points
+            if all(math.hypot(x - px, y - py) >= min_dist for px, py, _ in points):
+                points.append(candidate)
+            attempts += 1
+        if len(points) < num_points:
+            raise RuntimeError("Could not generate enough non-overlapping points.")
+        return points
 
     def _apply_action(self):
         self.robot.set_joint_position_target(self.robot_dof_targets) # 10 times

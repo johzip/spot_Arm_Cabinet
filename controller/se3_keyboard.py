@@ -164,15 +164,6 @@ class MMKeyboard(DeviceBase):
             if event.input.name in ["NUMPAD_7", "NUMPAD_8", "NUMPAD_4", "NUMPAD_5", "NUMPAD_1", "NUMPAD_2"]:
                 #3: test this, rework action_map
                 self._gripper_command += self._INPUT_KEY_MAPPING[event.input.name]
-                action_map = {
-                    "NUMPAD_7": "👐 Open Gripper",
-                    "NUMPAD_8": "🤏 Close Gripper", 
-                    "NUMPAD_4": "🔄 Rotating wrist CCW",
-                    "NUMPAD_5": "🔄 Rotating wrist CW", 
-                    "NUMPAD_1": "↗️ Tipping wrist up",
-                    "NUMPAD_2": "↘️ Tipping wrist down"
-                }
-                print(action_map.get(event.input.name, "Wrist movement"))
 
             elif event.input.name in ["W", "S", "A", "D", "Z", "X"]:
                 self._value = event.input.name

@@ -409,8 +409,7 @@ class SpotCurtainEnv( DirectRLEnv):
         gripper_comd = None
 
         if(self.vla_mode):
-            actions = actions.clone()
-            actions[:, 3:6] = actions[:, 3:6] * 0.2 
+            actions[:, 3:6] = actions[:, 3:6] * 0.1
             gripper_comd = actions[:,9:]
             #TODO:scale the action commands properly with maximum output and min input thresholds
             transformed_pos_cmd, transformed_ori_cmd = self.calculate_arm_goal(actions)
@@ -427,22 +426,10 @@ class SpotCurtainEnv( DirectRLEnv):
 
         else:
             arm_pos = None
-            arm_ori = None
             target_arm_pos = None
 
             if actions[:,3:].any()!=0:
                 arm_pos = actions[:,3:6]  # arm position (3) + arm rotation (3)
-                axis_angle = actions[0:,6:9].cpu().numpy()
-                quat_numpy = axisangle2quat(axis_angle)  # Convert Euler to Quaternion
-                
-                
-                
-                arm_ori = torch.tensor(
-                    [quat_numpy],  # Wrap in list to create [1, 4] batch dimension
-                    device=actions.device, 
-                    dtype=torch.float32
-                )
-
                 target_arm_pos = self.arm_ee_pos_w + arm_pos  # [num_envs, 3] + [num_envs, 3]
             else:
                 target_arm_pos = None
@@ -459,42 +446,15 @@ class SpotCurtainEnv( DirectRLEnv):
         #if not all(success):
             # this means IK failed because of unreachable target position. so use arm position command to move robot base instead.
 
-        
-        # FIXED: Safer debug printing and joint assignment
         for joint_action, joint_indices in zip(action, index):
-            print(f"Joint action shape: {joint_action.shape}, indices shape: {len(joint_indices)}")
-            print(f"Joint indices: {joint_indices}")
-            
-            # Apply joint actions
             self.robot_dof_targets[:, joint_indices] = joint_action
-            
-            # FIXED: Safer debug printing
-            for i, joint_idx in enumerate(joint_indices):
-                joint_name = self.robot.joint_names[joint_idx]
-                
-                # Handle different tensor shapes safely
-                if joint_action.dim() == 1:  # 1D tensor [joint_values]
-                    joint_value = joint_action[i].item()
-                elif joint_action.dim() == 2:  # 2D tensor [num_envs, joint_values]
-                    joint_value = joint_action[0, i].item()  # Take first environment
-                else:
-                    joint_value = "N/A (complex tensor)"
-                    
-                print(f"Action for joint '{joint_name}' (id {joint_idx}): {joint_value}")
-
-        # Rest of gripper code remains the same...
-        print(f"gripper_comd shape: {gripper_comd.shape}")
-        print(f"gripper_comd: {gripper_comd}")
 
         joint_names = self.robot.joint_names
         wr0_idx = joint_names.index('arm0_wr0') if 'arm0_wr0' in joint_names else None
         wr1_idx = joint_names.index('arm0_wr1') if 'arm0_wr1' in joint_names else None  
         f1x_idx = joint_names.index('arm0_f1x') if 'arm0_f1x' in joint_names else None
 
-        if gripper_comd is not None and torch.any(gripper_comd != 0):            
-            # Find joint indices for wrist and gripper
-            
-            
+        if gripper_comd is not None and torch.any(gripper_comd != 0):
             # Apply gripper commands directly
             if f1x_idx is not None:
                 gripper_step = gripper_comd[:, 0] * 5.0  # Increased to 5° per step

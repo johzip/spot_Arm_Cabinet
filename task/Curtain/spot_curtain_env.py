@@ -172,7 +172,7 @@ class SpotCurtainEnv( DirectRLEnv):
             spawn_from_usd(
                 prim_path=bridgeData_prim_path+"/banana",
                 cfg=banana_cfg,
-                translation=positions_list.pop(0),
+                translation=(0.67, 1.08, 0.313),
                 orientation=(0, 0, 0, 0),  # x, y, z, w
             )
 
